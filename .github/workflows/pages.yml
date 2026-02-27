@@ -3,7 +3,7 @@ name: Deploy GitHub Pages
 # Деплой при изменениях в docs/ или вручную
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths: ['docs/**']
   workflow_dispatch:
 
