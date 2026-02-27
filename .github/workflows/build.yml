@@ -1,0 +1,134 @@
+name: Build and Release
+
+# Ручной запуск через GitHub UI или gh workflow run
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Сборка на Ubuntu (GitHub-hosted runner)
+    runs-on: ubuntu-latest
+
+    steps:
+      # Клонирование репозитория с полной историей (для тегов)
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Установка Go для кросс-компиляции
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      # Извлечение версии из git-тега (vX.Y.Z)
+      - name: Get version from tag
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      # Кросс-компиляция бинарников для 4 архитектур параллельно
+      - name: Build binaries
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=${{ steps.tag.outputs.tag }}" -o awg-proxy-linux-arm64 . &
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w -X main.version=${{ steps.tag.outputs.tag }}" -o awg-proxy-linux-arm . &
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=5 go build -trimpath -ldflags="-s -w -X main.version=${{ steps.tag.outputs.tag }}" -o awg-proxy-linux-armv5 . &
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=${{ steps.tag.outputs.tag }}" -o awg-proxy-linux-amd64 . &
+          wait
+
+      # QEMU для эмуляции ARM при сборке Docker-образов
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Buildx для мультиплатформенной сборки Docker
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # OCI-образы для RouterOS 7.x (4 архитектуры параллельно)
+      - name: Build Docker OCI images
+        run: |
+          docker buildx build --platform linux/arm64 --output type=oci,dest=awg-proxy-arm64.tar -t awg-proxy:arm64 . &
+          docker buildx build --platform linux/arm/v7 --output type=oci,dest=awg-proxy-arm.tar -t awg-proxy:arm . &
+          docker buildx build --platform linux/arm/v5 --output type=oci,dest=awg-proxy-armv5.tar -t awg-proxy:armv5 . &
+          docker buildx build --platform linux/amd64 --output type=oci,dest=awg-proxy-amd64.tar -t awg-proxy:amd64 . &
+          wait
+
+      # Classic Docker tar для RouterOS 7.20 LT (без OCI)
+      - name: Build Docker images for RouterOS 7.20 LT
+        env:
+          VERSION: ${{ steps.tag.outputs.tag }}
+        run: |
+          scripts/mkdockertar.sh linux arm64 "" awg-proxy:arm64 awg-proxy-arm64-7.20-Docker.tar &
+          scripts/mkdockertar.sh linux arm 7 awg-proxy:arm awg-proxy-arm-7.20-Docker.tar &
+          scripts/mkdockertar.sh linux arm 5 awg-proxy:armv5 awg-proxy-armv5-7.20-Docker.tar &
+          scripts/mkdockertar.sh linux amd64 "" awg-proxy:amd64 awg-proxy-amd64-7.20-Docker.tar &
+          wait
+
+      # Сжатие всех tar-файлов (8 артефактов)
+      - name: Gzip tar files
+        run: gzip awg-proxy-arm64.tar awg-proxy-arm.tar awg-proxy-armv5.tar awg-proxy-amd64.tar awg-proxy-arm64-7.20-Docker.tar awg-proxy-arm-7.20-Docker.tar awg-proxy-armv5-7.20-Docker.tar awg-proxy-amd64-7.20-Docker.tar
+
+      # Загрузка всех артефактов для передачи в release-джобу
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: |
+            awg-proxy-linux-arm64
+            awg-proxy-linux-arm
+            awg-proxy-linux-armv5
+            awg-proxy-linux-amd64
+            awg-proxy-arm64.tar.gz
+            awg-proxy-arm.tar.gz
+            awg-proxy-armv5.tar.gz
+            awg-proxy-amd64.tar.gz
+            awg-proxy-arm64-7.20-Docker.tar.gz
+            awg-proxy-arm-7.20-Docker.tar.gz
+            awg-proxy-armv5-7.20-Docker.tar.gz
+            awg-proxy-amd64-7.20-Docker.tar.gz
+
+  release:
+    needs: build
+    # Публикация релиза после успешной сборки
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # Клонирование для доступа к RELEASE_TEMPLATE.md
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Скачивание артефактов из build-джобы
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+
+      # Создание GitHub Release с бинарниками и Docker-образами
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          body_path: docs/RELEASE_TEMPLATE.md
+          append_body: true
+          generate_release_notes: true
+          files: |
+            awg-proxy-linux-arm64
+            awg-proxy-linux-arm
+            awg-proxy-linux-armv5
+            awg-proxy-linux-amd64
+            awg-proxy-arm64.tar.gz
+            awg-proxy-arm.tar.gz
+            awg-proxy-armv5.tar.gz
+            awg-proxy-amd64.tar.gz
+            awg-proxy-arm64-7.20-Docker.tar.gz
+            awg-proxy-arm-7.20-Docker.tar.gz
+            awg-proxy-armv5-7.20-Docker.tar.gz
+            awg-proxy-amd64-7.20-Docker.tar.gz

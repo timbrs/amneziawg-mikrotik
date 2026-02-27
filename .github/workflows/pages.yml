@@ -1,0 +1,37 @@
+name: Deploy GitHub Pages
+
+# Деплой при изменениях в docs/ или вручную
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # Деплой на Ubuntu (GitHub-hosted runner)
+    runs-on: ubuntu-latest
+    steps:
+      # Клонирование репозитория
+      - uses: actions/checkout@v4
+      # Настройка GitHub Pages
+      - uses: actions/configure-pages@v5
+      # Загрузка папки docs/ как артефакт для Pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      # Деплой артефакта на GitHub Pages
+      - id: deployment
+        uses: actions/deploy-pages@v4
