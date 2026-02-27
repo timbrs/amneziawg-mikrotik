@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWG Proxy — Offline MikroTik Command Generator</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #f5f6f8;
+            --surface: #ffffff;
+            --border: #d1d5db;
+            --border-focus: #6366f1;
+            --text: #111827;
+            --text-muted: #6b7280;
+            --accent: #4f46e5;
+            --accent-hover: #4338ca;
+            --success: #059669;
+            --success-bg: #ecfdf5;
+            --error: #dc2626;
+            --error-bg: #fef2f2;
+            --tag-ok: #d1fae5;
+            --tag-ok-text: #065f46;
+            --tag-miss: #fee2e2;
+            --tag-miss-text: #991b1b;
+            --mono: 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 24px 16px 48px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 32px;
+        }
+
+        header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 14px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        textarea {
+            width: 100%;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            line-height: 1.5;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            resize: vertical;
+            background: #fafafa;
+            color: var(--text);
+            transition: border-color 0.15s;
+            min-height: 280px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+        }
+
+        textarea::placeholder {
+            color: #9ca3af;
+        }
+
+        select, input[type="text"] {
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fafafa;
+            color: var(--text);
+            transition: border-color 0.15s;
+        }
+
+        select:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+        }
+
+        #storage-custom, #prefix-custom {
+            margin-left: 8px;
+            width: 160px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            user-select: none;
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .fields-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .field-tag {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-family: var(--mono);
+            gap: 8px;
+        }
+
+        .field-tag.ok {
+            background: var(--tag-ok);
+            color: var(--tag-ok-text);
+        }
+
+        .field-tag.miss {
+            background: var(--tag-miss);
+            color: var(--tag-miss-text);
+        }
+
+        .field-tag .fname {
+            font-weight: 600;
+        }
+
+        .field-tag .fval {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 120px;
+            opacity: 0.8;
+        }
+
+        .output-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        pre#output, pre#uninstall-output {
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            line-height: 1.6;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            white-space: pre;
+            tab-size: 2;
+        }
+
+        pre#output .comment, pre#uninstall-output .comment {
+            color: #64748b;
+        }
+
+        pre#output .cmd, pre#uninstall-output .cmd {
+            color: #7dd3fc;
+        }
+
+        .alert {
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 0.875rem;
+            margin-top: 12px;
+        }
+
+        .alert-error {
+            background: var(--error-bg);
+            border: 1px solid #fca5a5;
+            color: var(--error);
+        }
+
+        #errors-container {
+            margin-bottom: 4px;
+        }
+
+        #parsed-section, #output-section, #uninstall-section {
+            display: none;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-top: 40px;
+        }
+
+        @media (max-width: 600px) {
+            header h1 {
+                font-size: 1.4rem;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            pre#output {
+                font-size: 0.72rem;
+                padding: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <header>
+        <h1>AWG Proxy &mdash; MikroTik Offline Command Generator</h1>
+        <p>Paste your AmneziaWG .conf file contents to generate ready-to-use MikroTik RouterOS commands</p>
+    </header>
+
+    <div class="card">
+        <div class="card-title">AmneziaWG Configuration File</div>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            All configuration and data is processed locally in your browser. Nothing is transmitted anywhere. Your private keys are safe.<br>
+            Вся конфигурация и все данные обрабатываются локально в вашем браузере. Ничего никуда не передается. Ваши приватные ключи в безопасности.
+        </p>
+        <label for="conf-input">.conf file contents</label>
+        <textarea id="conf-input"
+                  placeholder="[Interface]&#10;PrivateKey = ...&#10;Address = 10.1.1.1/32&#10;DNS = 1.1.1.1&#10;Jc = 2&#10;Jmin = 1&#10;Jmax = 500&#10;S1 = 123&#10;S2 = 12&#10;H1 = 12345&#10;...&#10;&#10;[Peer]&#10;PublicKey = ...&#10;Endpoint = 1.2.3.4:12345&#10;AllowedIPs = 0.0.0.0/0"></textarea>
+        <div style="margin-top:14px">
+            <label for="storage-select">Container storage</label>
+            <select id="storage-select">
+                <option value="disk1">disk1/ — internal storage (default)</option>
+                <option value="usb1">usb1/ — USB flash drive (common)</option>
+                <option value="usb1-part1">usb1-part1/ — USB partition</option>
+                <option value="usb2">usb2/ — USB flash drive (2nd)</option>
+                <option value="sd1">sd1/ — SD / microSD card</option>
+                <option value="nvme1">nvme1/ — NVMe SSD</option>
+                <option value="sata1">sata1/ — SATA drive</option>
+                <option value="__custom">Custom...</option>
+            </select>
+            <input type="text" id="storage-custom" placeholder="e.g. sata1-part1" style="display:none">
+        </div>
+        <div style="margin-top:14px">
+            <label for="prefix-select">Tunnel name (prefix)</label>
+            <select id="prefix-select">
+                <option value="awg-proxy">awg-proxy — 1st tunnel (default)</option>
+                <option value="awg-proxy-2">awg-proxy-2 — 2nd tunnel</option>
+                <option value="awg-proxy-3">awg-proxy-3 — 3rd tunnel</option>
+                <option value="awg-proxy-4">awg-proxy-4 — 4th tunnel</option>
+                <option value="__custom">Custom...</option>
+            </select>
+            <input type="text" id="prefix-custom" placeholder="e.g. awg-office" style="display:none">
+        </div>
+        <div class="actions">
+            <button class="btn btn-primary" onclick="generate()">Generate commands</button>
+            <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+        </div>
+    </div>
+
+    <div id="errors-container"></div>
+
+    <div id="parsed-section" class="card">
+        <div class="card-title">Parsed parameters</div>
+        <div id="fields-display"></div>
+    </div>
+
+    <div id="output-section" class="card">
+        <div class="output-header">
+            <div class="card-title" style="margin-bottom:0">MikroTik RouterOS Commands</div>
+            <button class="btn btn-secondary" id="copy-btn" onclick="copyOutput('output','copy-btn')">Copy all</button>
+        </div>
+        <pre id="output"></pre>
+    </div>
+
+    <div id="uninstall-section" class="card">
+        <div class="output-header">
+            <div class="card-title" style="margin-bottom:0">Uninstall Commands</div>
+            <button class="btn btn-secondary" id="copy-uninstall-btn"
+                    onclick="copyOutput('uninstall-output','copy-uninstall-btn')">Copy uninstall
+            </button>
+        </div>
+        <pre id="uninstall-output"></pre>
+    </div>
+
+    <footer>Works entirely offline &mdash; no data leaves your browser.</footer>
+</div>
+
+<script>
+    'use strict';
+
+    // ============================================================
+    // .conf parser
+    // ============================================================
+    function parseConf(text) {
+        var result = {interface: {}, peer: {}};
+        var section = null;
+        var lines = text.split(/\r?\n/);
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line || line[0] === '#' || line[0] === ';') continue;
+            if (line === '[Interface]') {
+                section = 'interface';
+                continue;
+            }
+            if (line === '[Peer]') {
+                section = 'peer';
+                continue;
+            }
+            if (!section) continue;
+            var eq = line.indexOf('=');
+            if (eq < 0) continue;
+            result[section][line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+        }
+        return result;
+    }
+
+    // ============================================================
+    // Field definitions
+    // ============================================================
+    var IFACE_REQUIRED = ['PrivateKey', 'Address', 'Jc', 'Jmin', 'Jmax', 'S1', 'S2', 'H1', 'H2', 'H3', 'H4'];
+    var IFACE_OPTIONAL = ['DNS', 'S3', 'S4', 'I1', 'I2', 'I3', 'I4', 'I5'];
+    var PEER_REQUIRED = ['PublicKey', 'Endpoint', 'AllowedIPs'];
+    var PEER_OPTIONAL = ['PresharedKey', 'PersistentKeepalive'];
+
+    // ============================================================
+    // Render parsed fields as tags
+    // ============================================================
+    function renderFields(parsed) {
+        var proto = detectProtocol(parsed.interface);
+        var badgeColors = {
+            'v1':   'background:#e5e7eb;color:#374151',
+            'v1.5': 'background:#fef3c7;color:#92400e',
+            'v2':   'background:#dbeafe;color:#1e40af'
+        };
+        var protoBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600;' + badgeColors[proto] + ';margin-left:8px">AWG ' + proto + '</span>';
+        var html = '<div style="margin-bottom:8px;font-size:0.8rem;color:var(--text-muted)">[Interface] section' + protoBadge + '</div>';
+        html += '<div class="fields-grid">';
+        IFACE_REQUIRED.concat(IFACE_OPTIONAL).forEach(function (k) {
+            var v = parsed.interface[k];
+            var ok = !!v;
+            var opt = IFACE_OPTIONAL.indexOf(k) >= 0;
+            var display = v ? (v.length > 18 ? v.slice(0, 15) + '...' : v) : 'missing';
+            html += '<div class="field-tag ' + (ok || opt ? 'ok' : 'miss') + '">' +
+                '<span class="fname">' + esc(k) + '</span>' +
+                '<span class="fval">' + esc(display) + '</span></div>';
+        });
+        html += '</div>';
+
+        html += '<div style="margin:14px 0 8px;font-size:0.8rem;color:var(--text-muted)">[Peer] section</div>';
+        html += '<div class="fields-grid">';
+        PEER_REQUIRED.concat(PEER_OPTIONAL).forEach(function (k) {
+            var v = parsed.peer[k];
+            var ok = !!v;
+            var req = PEER_REQUIRED.indexOf(k) >= 0;
+            var display = v ? (v.length > 18 ? v.slice(0, 15) + '...' : v) : 'missing';
+            html += '<div class="field-tag ' + (ok || !req ? 'ok' : 'miss') + '">' +
+                '<span class="fname">' + esc(k) + '</span>' +
+                '<span class="fval">' + esc(display) + '</span></div>';
+        });
+        html += '</div>';
+        return html;
+    }
+
+    // ============================================================
+    // Validation helpers
+    // ============================================================
+    function isValidBase64Key(s) {
+        if (!s || s.length !== 44) return false;
+        try { return atob(s).length === 32; } catch(e) { return false; }
+    }
+
+    function isNonNegativeInt(s) {
+        return /^(0|[1-9]\d*)$/.test(s);
+    }
+
+    function isUint32(s) {
+        if (!isNonNegativeInt(s)) return false;
+        var n = Number(s);
+        return n >= 0 && n <= 4294967295;
+    }
+
+    function isHValue(s) {
+        if (isUint32(s)) return true;
+        var parts = s.split('-');
+        return parts.length === 2 && isUint32(parts[0]) && isUint32(parts[1])
+               && Number(parts[0]) <= Number(parts[1]);
+    }
+
+    function isValidIPCIDR(s) {
+        var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/.exec(s);
+        if (!m) return false;
+        for (var i = 1; i <= 4; i++) { if (Number(m[i]) > 255) return false; }
+        return Number(m[5]) <= 32;
+    }
+
+    function isValidEndpoint(s) {
+        var idx = s.lastIndexOf(':');
+        if (idx < 1) return false;
+        var port = Number(s.slice(idx + 1));
+        return port > 0 && port <= 65535;
+    }
+
+    function isValidIPv6CIDR(s) {
+        var m = /^([0-9a-fA-F:]+)\/(1[0-2][0-9]|[0-9]{1,2})$/.exec(s);
+        if (!m) return false;
+        if (Number(m[2]) > 128) return false;
+        var addr = m[1];
+        // reject leading/trailing single colons (but allow :: anywhere)
+        if (/^:[^:]/.test(addr) || /[^:]:$/.test(addr)) return false;
+        // must contain at least one colon
+        if (addr.indexOf(':') < 0) return false;
+        // at most one :: group
+        if ((addr.match(/::/g) || []).length > 1) return false;
+        return true;
+    }
+
+    function isValidAllowedIPs(s) {
+        var parts = s.split(/\s*,\s*/);
+        for (var i = 0; i < parts.length; i++) {
+            var p = parts[i].trim();
+            if (!isValidIPCIDR(p) && !isValidIPv6CIDR(p)) return false;
+        }
+        return parts.length > 0;
+    }
+
+    function isValidIP(s) {
+        var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s);
+        if (!m) return false;
+        for (var i = 1; i <= 4; i++) { if (Number(m[i]) > 255) return false; }
+        return true;
+    }
+
+    function isValidDNS(s) {
+        var parts = s.split(/\s*,\s*/);
+        for (var i = 0; i < parts.length; i++) {
+            if (!isValidIP(parts[i].trim())) return false;
+        }
+        return parts.length > 0;
+    }
+
+    function isPositiveInt(s) {
+        return /^[1-9]\d*$/.test(s);
+    }
+
+    function isValidCPSTemplate(s) {
+        if (!s || !s.trim()) return false;
+        var i = 0;
+        var count = 0;
+        while (i < s.length) {
+            if (s[i] === ' ' || s[i] === '\t' || s[i] === '\n' || s[i] === '\r') { i++; continue; }
+            if (s[i] !== '<') return false;
+            var end = s.indexOf('>', i + 1);
+            if (end < 0) return false;
+            var tag = s.slice(i + 1, end).trim();
+            if (!tag) return false;
+            var kind = tag[0];
+            if (kind === 'b') {
+                var hex = tag.slice(1).trim();
+                if (hex.length < 3 || hex.slice(0, 2).toLowerCase() !== '0x') return false;
+                if (!/^[0-9a-fA-F]*$/.test(hex.slice(2)) || hex.length < 4 || (hex.length - 2) % 2 !== 0) return false;
+            } else if (kind === 'r') {
+                if (tag.length > 1 && (tag[1] === 'c' || tag[1] === 'd')) {
+                    var n = tag.slice(2).trim();
+                    if (!/^[1-9]\d*$/.test(n)) return false;
+                } else {
+                    var n = tag.slice(1).trim();
+                    if (!/^[1-9]\d*$/.test(n)) return false;
+                }
+            } else if (kind === 't' || kind === 'c') {
+                if (tag.trim().length !== 1) return false;
+            } else {
+                return false;
+            }
+            count++;
+            i = end + 1;
+        }
+        return count > 0;
+    }
+
+    function detectProtocol(iface) {
+        var hasHRange = (iface.H1 && iface.H1.indexOf('-') >= 0) ||
+            (iface.H2 && iface.H2.indexOf('-') >= 0) ||
+            (iface.H3 && iface.H3.indexOf('-') >= 0) ||
+            (iface.H4 && iface.H4.indexOf('-') >= 0);
+        if (iface.S3 || iface.S4 || hasHRange) return 'v2';
+        if (iface.I1 || iface.I2 || iface.I3 || iface.I4 || iface.I5) return 'v1.5';
+        return 'v1';
+    }
+
+    // ============================================================
+    // Validate
+    // ============================================================
+    function validate(parsed) {
+        var errors = [];
+        var iface = parsed.interface;
+        var peer = parsed.peer;
+
+        // Check presence first
+        IFACE_REQUIRED.forEach(function (k) {
+            if (!iface[k]) errors.push('[Interface] ' + k + ' -- missing');
+        });
+        PEER_REQUIRED.forEach(function (k) {
+            if (!peer[k]) errors.push('[Peer] ' + k + ' -- missing');
+        });
+        if (errors.length > 0) return errors;
+
+        // Format validation
+        if (!isValidBase64Key(iface.PrivateKey))
+            errors.push('[Interface] PrivateKey -- invalid base64 key (expected 44 chars, 32 bytes)');
+        if (!isValidIPCIDR(iface.Address))
+            errors.push('[Interface] Address -- invalid format (expected X.X.X.X/N)');
+        if (iface.DNS && !isValidDNS(iface.DNS))
+            errors.push('[Interface] DNS -- invalid format (expected comma-separated IPs)');
+
+        if (!isNonNegativeInt(iface.Jc))
+            errors.push('[Interface] Jc -- must be a non-negative integer');
+        if (!isNonNegativeInt(iface.Jmin))
+            errors.push('[Interface] Jmin -- must be a non-negative integer');
+        if (!isNonNegativeInt(iface.Jmax))
+            errors.push('[Interface] Jmax -- must be a non-negative integer');
+        if (isNonNegativeInt(iface.Jmin) && isNonNegativeInt(iface.Jmax) && Number(iface.Jmin) > Number(iface.Jmax))
+            errors.push('[Interface] Jmin must be <= Jmax');
+
+        if (!isNonNegativeInt(iface.S1))
+            errors.push('[Interface] S1 -- must be a non-negative integer');
+        if (!isNonNegativeInt(iface.S2))
+            errors.push('[Interface] S2 -- must be a non-negative integer');
+        if (iface.S3 && !isNonNegativeInt(iface.S3))
+            errors.push('[Interface] S3 -- must be a non-negative integer');
+        if (iface.S4 && !isNonNegativeInt(iface.S4))
+            errors.push('[Interface] S4 -- must be a non-negative integer');
+
+        if (!isHValue(iface.H1))
+            errors.push('[Interface] H1 -- must be uint32 or range MIN-MAX');
+        if (!isHValue(iface.H2))
+            errors.push('[Interface] H2 -- must be uint32 or range MIN-MAX');
+        if (!isHValue(iface.H3))
+            errors.push('[Interface] H3 -- must be uint32 or range MIN-MAX');
+        if (!isHValue(iface.H4))
+            errors.push('[Interface] H4 -- must be uint32 or range MIN-MAX');
+
+        if (!isValidBase64Key(peer.PublicKey))
+            errors.push('[Peer] PublicKey -- invalid base64 key (expected 44 chars, 32 bytes)');
+        if (!isValidEndpoint(peer.Endpoint))
+            errors.push('[Peer] Endpoint -- invalid format (expected host:port)');
+        if (!isValidAllowedIPs(peer.AllowedIPs))
+            errors.push('[Peer] AllowedIPs -- invalid format (expected comma-separated CIDR)');
+        if (peer.PresharedKey && !isValidBase64Key(peer.PresharedKey))
+            errors.push('[Peer] PresharedKey -- invalid base64 key (expected 44 chars, 32 bytes)');
+        if (peer.PersistentKeepalive && !isPositiveInt(peer.PersistentKeepalive))
+            errors.push('[Peer] PersistentKeepalive -- must be a positive integer');
+
+        ['I1','I2','I3','I4','I5'].forEach(function(k) {
+            if (iface[k] && !isValidCPSTemplate(iface[k]))
+                errors.push('[Interface] ' + k + ' -- invalid CPS template (valid tags: <b 0xHEX>, <r N>, <rc N>, <rd N>, <t>, <c>)');
+        });
+
+        return errors;
+    }
+
+    // ============================================================
+    // DNS helpers
+    // ============================================================
+    function parseDNSServers(s) {
+        if (!s) return [];
+        return s.split(/\s*,\s*/).filter(function(x) { return x; });
+    }
+
+    // ============================================================
+    // Generate uninstall script as /system/script/add command
+    // ============================================================
+    function buildUninstallScriptSource(hasDNS, storageDisk, prefix, net) {
+        var src = [];
+        src.push('/system/script/add name=' + prefix + '-uninstall comment=' + prefix + ' source={');
+        src.push('  :put "Uninstallimg AmneziaWG..."');
+        src.push('  :log info "Uninstallimg AmneziaWG..."');
+        if (hasDNS) {
+            src.push('  :local prevDNS ""');
+            src.push('  :do { :set prevDNS [/container/envs/get [find where list="' + prefix + '-env" key="AWG_PREV_DNS"] value] } on-error={}');
+        }
+        if (storageDisk !== 'disk1') {
+            src.push('  :local prevTmpdir ""');
+            src.push('  :do { :set prevTmpdir [/container/envs/get [find where list="' + prefix + '-env" key="AWG_PREV_TMPDIR"] value] } on-error={}');
+        }
+        src.push('  /ip/route/remove [find where comment=' + prefix + '-tunnel]');
+        if (hasDNS) {
+            src.push('  /ip/route/remove [find where comment=' + prefix + '-dns]');
+        }
+        src.push('  /container/stop [find where interface=veth-' + prefix + ']');
+        src.push('  :delay 7s');
+        src.push('  /container/remove [find where interface=veth-' + prefix + ']');
+        src.push('  /container/envs/remove [find where list="' + prefix + '-env"]');
+        if (hasDNS) {
+            src.push('  :if ($prevDNS != "") do={');
+            src.push('    /ip/dns/set servers=$prevDNS');
+            src.push('    :put ("DNS restored to: $prevDNS")');
+            src.push('  }');
+        }
+        if (storageDisk !== 'disk1') {
+            src.push('  /container/config set tmpdir=$prevTmpdir');
+            src.push('  :put ("Container tmpdir restored to: $prevTmpdir")');
+        }
+        src.push('  /ip/firewall/nat/remove [find where out-interface="wg-' + prefix + '"]');
+        src.push('  /ip/firewall/nat/remove [find where src-address="' + net.natSrc + '"]');
+        src.push('  /ip/address/remove [find where address="' + net.hostAddr + '"]');
+        src.push('  /interface/veth/remove [find where name="veth-' + prefix + '"]');
+        src.push('  /interface/wireguard/peers/remove [find where interface="wg-' + prefix + '"]');
+        src.push('  /ip/address/remove [find where interface="wg-' + prefix + '"]');
+        src.push('  /interface/wireguard/remove [find where name="wg-' + prefix + '"]');
+        src.push('  :do { /file/remove [find where name~"' + prefix + '.+tar"] } on-error={}');
+        src.push('  :do { /file/remove [find where name="' + storageDisk + '/' + prefix + '"] } on-error={}');
+        if (storageDisk !== 'disk1') {
+            src.push('  :do { /file/remove [find where name~"' + storageDisk + '/pull"] } on-error={}');
+        }
+        src.push('  :put "Uninstall AmneziaWG Proxy complete!"');
+        src.push('  :log info "Uninstall AmneziaWG Proxy complete!"');
+        src.push('  /system/script/remove [find where name=' + prefix + '-uninstall]');
+        src.push('}');
+        return src.join('\n');
+    }
+
+    // ============================================================
+    // Generate MikroTik commands
+    // ============================================================
+    function buildCommands(parsed, storageDisk, prefix, net) {
+        var i = parsed.interface;
+        var p = parsed.peer;
+        var dnsServers = parseDNSServers(i.DNS);
+        var hasDNS = dnsServers.length > 0;
+
+        var vethIP = net.vethAddr.replace(/\/.*/, '');
+        var peerAdd = '/interface/wireguard/peers/add interface=wg-' + prefix +
+            ' public-key="' + p.PublicKey + '"';
+        if (p.PresharedKey) peerAdd += ' preshared-key="' + p.PresharedKey + '"';
+        peerAdd += ' endpoint-address=' + vethIP + ' endpoint-port=51820' +
+            ' allowed-address=' + p.AllowedIPs.replace(/\s*,\s*/g, ',');
+        if (p.PersistentKeepalive) peerAdd += ' persistent-keepalive=' + p.PersistentKeepalive;
+
+        var detectedProto = detectProtocol(i);
+        var lines = [
+            '# ============================================================',
+            '# AWG Proxy -- MikroTik RouterOS (protocol: ' + detectedProto + ')',
+            '# ' + new Date().toISOString().slice(0, 19).replace('T', ' '),
+            '# ============================================================',
+            '',
+            '# 0. Check prerequisites',
+            ':if ([:len [/system/package/find where name="container" disabled=no]] = 0) do={',
+            '  :put "Container package is not installed or disabled. Install it and reboot."',
+            '  :error "Usage: /system/device-mode/update container=yes"',
+            '}',
+            '',
+        ];
+
+        if (storageDisk !== 'disk1') {
+            lines = lines.concat([
+                '# Check storage device',
+                '{',
+                '  :local targetDisk "' + storageDisk + '"',
+                '  :local diskFree 0',
+                '  :do { :set diskFree [/disk/get [find where mount-point=$targetDisk] free] } on-error={}',
+                '  :if ($diskFree = 0) do={',
+                '    :local baseDisk $targetDisk',
+                '    :local dashPos [:find $targetDisk "-part"]',
+                '    :if ([:typeof $dashPos] != "nil") do={ :set baseDisk [:pick $targetDisk 0 $dashPos] }',
+                '    :if ([:len [/disk/find where slot=$baseDisk]] > 0) do={',
+                '      :put ("Device $baseDisk found but $targetDisk is not available.")',
+                '      :put "Format $baseDisk as ext4? ALL DATA WILL BE ERASED!"',
+                "      :put \"Press 'y' to confirm, any other key to cancel:\"",
+                '      :local key [/terminal/inkey timeout=30]',
+                '      :if ($key = 121 || $key = 89) do={',
+                '        :put "Formatting $baseDisk as ext4..."',
+                '        /disk/format-drive $baseDisk file-system=ext4 label=$baseDisk',
+                '        :delay 3s',
+                '        :do { :set diskFree [/disk/get [find where mount-point=$targetDisk] free] } on-error={}',
+                '        :if ($diskFree = 0) do={',
+                '          :put ("ERROR: $targetDisk not found after formatting.")',
+                '          :put "Check mount point: /disk/print"',
+                '          :error ("Mount point $targetDisk not found after formatting")',
+                '        }',
+                '        :put ("Formatted OK. Free: " . ($diskFree / 1048576) . " MB")',
+                '      } else={',
+                '        :error "Formatting cancelled"',
+                '      }',
+                '    } else={',
+                '      :put ("ERROR: Storage device $targetDisk not found.")',
+                '      :put "Check available disks: /disk/print"',
+                '      :error ("Storage not found: " . $targetDisk)',
+                '    }',
+                '  } else={',
+                '    :put ("Storage OK: $targetDisk (" . ($diskFree / 1048576) . " MB free)")',
+                '  }',
+                '}',
+                '',
+            ]);
+        }
+
+        lines.push('# 1. Uninstall script');
+
+        lines.push(buildUninstallScriptSource(hasDNS, storageDisk, prefix, net));
+
+        lines = lines.concat([
+            '',
+            '# 2. Network infrastructure',
+            '/interface/veth/add name=veth-' + prefix + ' address=' + net.vethAddr + ' gateway=' + net.vethGw,
+            '/ip/address/add address=' + net.hostAddr + ' interface=veth-' + prefix,
+            '/ip/firewall/nat/add chain=srcnat action=masquerade src-address=' + net.natSrc,
+            '',
+            '# 3. WireGuard interface (MikroTik derives the public key automatically)',
+            '/interface/wireguard/add name=wg-' + prefix + ' private-key="' + i.PrivateKey + '" listen-port=' + net.wgPort + ' disabled=yes',
+            peerAdd,
+            '/ip/address/add address=' + i.Address + ' interface=wg-' + prefix,
+            '/ip/firewall/nat/add chain=srcnat action=masquerade out-interface=wg-' + prefix,
+            '',
+            '# 4. Container environment variables',
+            '/container/envs/add list=' + prefix + '-env key=AWG_LISTEN value=":51820"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_REMOTE value="' + p.Endpoint + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_JC value="' + i.Jc + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_JMIN value="' + i.Jmin + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_JMAX value="' + i.Jmax + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_S1 value="' + i.S1 + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_S2 value="' + i.S2 + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_H1 value="' + i.H1 + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_H2 value="' + i.H2 + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_H3 value="' + i.H3 + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_H4 value="' + i.H4 + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_SERVER_PUB value="' + p.PublicKey + '"',
+            '/container/envs/add list=' + prefix + '-env key=AWG_CLIENT_PUB value=[/interface/wireguard/get [find name=wg-' + prefix + '] public-key]',
+        ]);
+
+        if (i.S3) lines.push('/container/envs/add list=' + prefix + '-env key=AWG_S3 value="' + i.S3 + '"');
+        if (i.S4) lines.push('/container/envs/add list=' + prefix + '-env key=AWG_S4 value="' + i.S4 + '"');
+        ['I1','I2','I3','I4','I5'].forEach(function(k) {
+            if (i[k]) lines.push('/container/envs/add list=' + prefix + '-env key=AWG_' + k + ' value="' + i[k] + '"');
+        });
+
+        if (hasDNS) {
+            var dnsStr = dnsServers.join(',');
+            lines.push('');
+            lines.push('# 5. DNS');
+            lines.push(':local prevDNS [/ip/dns/get servers]');
+            lines.push('/container/envs/add list=' + prefix + '-env key=AWG_PREV_DNS value=$prevDNS');
+            lines.push('# NOTE: replaces existing DNS configuration');
+            lines.push('/ip/dns/set servers=' + dnsStr);
+            for (var d = 0; d < dnsServers.length; d++) {
+                lines.push('/ip/route/add dst-address=' + dnsServers[d] + '/32 gateway=wg-' + prefix + ' distance=1 comment=' + prefix + '-dns');
+            }
+        }
+
+        lines = lines.concat([
+            '',
+            '# ' + (hasDNS ? '6' : '5') + '. Download, create and start container',
+        ]);
+        if (storageDisk !== 'disk1') {
+            lines.push(':local prevTmpdir [/container/config/get tmpdir]');
+            lines.push('/container/envs/add list=' + prefix + '-env key=AWG_PREV_TMPDIR value=$prevTmpdir');
+            lines.push('/container/config set tmpdir=' + storageDisk + '/pull ram-high=200M');
+        }
+        lines = lines.concat([
+            '{',
+            '  :local arch [/system/resource/get architecture-name]',
+            '  :local ver [/system/resource/get version]',
+            '  :local dotPos [:find $ver "."]',
+            '  :local rest [:pick $ver ($dotPos + 1) [:len $ver]]',
+            '  :local endPos [:find $rest "."]',
+            '  :if ([:typeof $endPos] = "nil") do={ :set endPos [:find $rest " "] }',
+            '  :local minor [:tonum [:pick $rest 0 $endPos]]',
+            '  :local suffix ""',
+            '  :if ($minor <= 20) do={ :set suffix "-7.20-Docker" }',
+            '  :local file ""',
+            '  :if ($arch = "arm64") do={ :set file ("awg-proxy-arm64" . $suffix . ".tar.gz") }',
+            '  :if ($arch = "arm") do={ :set file ("awg-proxy-arm" . $suffix . ".tar.gz") }',
+            '  :if ($arch ~ "x86") do={ :set file ("awg-proxy-amd64" . $suffix . ".tar.gz") }',
+            '  :if ($file = "") do={ :error "Unsupported architecture: $arch" }',
+            '  :local url "https://github.com/timbrs/amneziawg-mikrotik/releases/latest/download/$file"',
+            '  :local filePath ' + (storageDisk !== 'disk1' ? '("' + storageDisk + '/pull/" . $file)' : '$file'),
+        ]);
+        if (storageDisk !== 'disk1') {
+            lines.push('  :do { /file/make-directory ' + storageDisk + '/pull } on-error={}');
+        }
+        lines = lines.concat([
+            '  :if ([:len [/file/find where name=$filePath]] = 0) do={',
+            '    :local freeStorage 0',
+        ]);
+        if (storageDisk === 'disk1') {
+            lines.push('    :set freeStorage [/system/resource/get free-hdd-space]');
+        } else {
+            lines.push('    :do { :set freeStorage [/disk/get [find where mount-point="' + storageDisk + '"] free] } on-error={}');
+        }
+        lines = lines.concat([
+            '    :if ($freeStorage < 5242880) do={',
+            '      :put ("WARNING: Low disk space (" . ($freeStorage / 1048576) . "MB free). Need at least 5MB.")',
+            '      :put "See: https://github.com/timbrs/amneziawg-mikrotik#insufficient-disk-space"',
+            '      :error "Insufficient disk space"',
+            '    }',
+            '    :put ("Fetching: $url -> " . $filePath)',
+            '    /tool/fetch url=$url dst-path=$filePath http-max-redirect-count=10',
+            '  } else={',
+            '    :put ("File already exists: " . $filePath)',
+            '  }',
+            '  /container/add file=$filePath interface=veth-' + prefix + ' envlist=' + prefix + '-env hostname=' + prefix + ' root-dir=' + storageDisk + '/' + prefix + ' logging=yes start-on-boot=yes comment=' + prefix,
+            '  :if ($minor > 20) do={ [:parse "/container/set [find where interface=veth-' + prefix + '] shm-size=4M"] }',
+            '  /file/remove $filePath',
+            '  :local freeMem [/system/resource/get free-memory]',
+            '  :if ($freeMem < 16777216) do={',
+            '    :put ("WARNING: Low memory (" . ($freeMem / 1048576) . "MB free). 16MB+ recommended.")',
+            '  }',
+            '  /container/start [find where interface=veth-' + prefix + ']',
+            '  :do { /file/remove [find where name="console-dump.txt"] } on-error={}',
+            '  :put "Waiting for container to start..."',
+            '  :delay 5s',
+            '  /interface/wireguard/enable wg-' + prefix,
+            '  :put "WireGuard interface enabled"',
+            '  :put "Installation complete!"',
+        ]);
+
+        if (hasDNS) {
+            var firstDNS = dnsServers[0];
+            lines = lines.concat([
+                '  :put "Ping test: ' + firstDNS + ' via AmneziaWG tunnel. repeat 10 times"',
+                '  /ping ' + firstDNS + ' count=10 interval=1',
+            ]);
+        }
+
+        lines = lines.concat([
+            '  :put ""',
+            '  :put "======= NEXT STEPS ======="',
+        ]);
+
+        if (detectedProto !== 'v2') {
+            lines = lines.concat([
+                '  :put ""',
+                '  :put "  [WARNING]: Your config uses AWG ' + detectedProto + '. For better obfuscation,"',
+                '  :put "  update AmneziaVPN (v2) to the latest version and regenerate the config."',
+                '  :put "  Latest version supports AWG v2 with H-ranges and S3/S4 padding."',
+                '  :put "  https://github.com/amnezia-vpn/amnezia-client/releases"',
+            ]);
+        }
+
+        lines = lines.concat([
+            '  :put ""',
+            '  :put "Route specific traffic through the AmneziaWG tunnel:"',
+            '  :put ""',
+            '  :put "  Route a single host:"',
+            '  :put "    /ip/route/add dst-address=8.8.8.8/32 gateway=wg-' + prefix + ' comment=' + prefix + '-tunnel"',
+            '  :put ""',
+            '  :put "  Route a subnet:"',
+            '  :put "    /ip/route/add dst-address=100.0.0.0/8 gateway=wg-' + prefix + ' comment=' + prefix + '-tunnel"',
+            '  :put ""',
+            '  :put "  Remove a route:"',
+            '  :put "    /ip/route/remove [find where comment=' + prefix + '-tunnel dst-address=8.8.8.8/32]"',
+            '  :put ""',
+            '  :put "  Show all tunnel routes:"',
+            '  :put "    /ip/route/print where comment=' + prefix + '-tunnel"',
+            '  :put ""',
+            '  :put "  Uninstall:"',
+            '  :put "    /system/script/run ' + prefix + '-uninstall"',
+            '  :put "========================="',
+            '}',
+            '',
+            '# ' + (hasDNS ? '7' : '6') + '. Verification',
+            '# /container/print',
+            '# /interface/wireguard/print',
+            '# /interface/wireguard/peers/print',
+        ]);
+
+        lines.push('');
+
+        return lines.join('\n');
+    }
+
+    // ============================================================
+    // Syntax highlight
+    // ============================================================
+    function highlight(text) {
+        return esc(text)
+            .replace(/^(# .*)$/mg, '<span class="comment">$1</span>')
+            .replace(/^(\/.+?\/\w+\/\w+)/mg, '<span class="cmd">$1</span>');
+    }
+
+    function esc(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ============================================================
+    // Storage selector
+    // ============================================================
+    document.getElementById('storage-select').addEventListener('change', function() {
+        var custom = document.getElementById('storage-custom');
+        if (this.value === '__custom') {
+            custom.style.display = 'inline-block';
+            custom.focus();
+        } else {
+            custom.style.display = 'none';
+            custom.value = '';
+        }
+    });
+
+    function getStorageDisk() {
+        var sel = document.getElementById('storage-select').value;
+        if (sel === '__custom') {
+            var v = document.getElementById('storage-custom').value.trim();
+            return v || 'disk1';
+        }
+        return sel;
+    }
+
+    document.getElementById('prefix-select').addEventListener('change', function() {
+        var custom = document.getElementById('prefix-custom');
+        if (this.value === '__custom') {
+            custom.style.display = 'inline-block';
+            custom.focus();
+        } else {
+            custom.style.display = 'none';
+            custom.value = '';
+        }
+    });
+
+    function getPrefixName() {
+        var sel = document.getElementById('prefix-select').value;
+        if (sel === '__custom') {
+            var v = document.getElementById('prefix-custom').value.trim();
+            return v || 'awg-proxy';
+        }
+        return sel;
+    }
+
+    function getTunnelNumber(prefix) {
+        if (prefix === 'awg-proxy') return 1;
+        if (prefix === 'awg-proxy-2') return 2;
+        if (prefix === 'awg-proxy-3') return 3;
+        if (prefix === 'awg-proxy-4') return 4;
+        return 1;
+    }
+
+    function getTunnelNetwork(n) {
+        var base = 4 * (n - 1);
+        return {
+            vethAddr: '172.18.0.' + (base + 2) + '/30',
+            hostAddr: '172.18.0.' + (base + 1) + '/30',
+            vethGw: '172.18.0.' + (base + 1),
+            natSrc: '172.18.0.' + base + '/30',
+            wgPort: 12428 + n
+        };
+    }
+
+    // ============================================================
+    // Main
+    // ============================================================
+    function generate() {
+        var text = document.getElementById('conf-input').value;
+        document.getElementById('errors-container').innerHTML = '';
+        document.getElementById('parsed-section').style.display = 'none';
+        document.getElementById('output-section').style.display = 'none';
+        document.getElementById('uninstall-section').style.display = 'none';
+
+        if (!text.trim()) {
+            showError('Configuration field is empty. Paste the contents of your .conf file.');
+            return;
+        }
+
+        var parsed = parseConf(text);
+        var errors = validate(parsed);
+
+        var has = Object.keys(parsed.interface).length > 0 || Object.keys(parsed.peer).length > 0;
+        if (has) {
+            document.getElementById('fields-display').innerHTML = renderFields(parsed);
+            document.getElementById('parsed-section').style.display = 'block';
+        }
+
+        if (errors.length > 0) {
+            var html = '<div class="alert alert-error"><strong>Errors:</strong><ul style="margin-top:6px;padding-left:18px">';
+            errors.forEach(function (e) {
+                html += '<li>' + esc(e) + '</li>';
+            });
+            html += '</ul></div>';
+            document.getElementById('errors-container').innerHTML = html;
+            return;
+        }
+
+        var prefix = getPrefixName();
+        if (!(/^[a-zA-Z0-9]$/.test(prefix) || /^[a-zA-Z0-9][a-zA-Z0-9-]{0,28}[a-zA-Z0-9]$/.test(prefix))) {
+            showError('Invalid tunnel prefix: only letters, digits, and hyphens allowed (1-30 chars, cannot start/end with hyphen).');
+            return;
+        }
+        var tunnelN = getTunnelNumber(prefix);
+        var net = getTunnelNetwork(tunnelN);
+        var commands = buildCommands(parsed, getStorageDisk(), prefix, net);
+        document.getElementById('output').dataset.plain = commands;
+        document.getElementById('output').innerHTML = highlight(commands);
+        document.getElementById('output-section').style.display = 'block';
+
+        var uninstall = [
+            '# To uninstall ' + prefix + ', run:',
+            '/system/script/run ' + prefix + '-uninstall',
+        ].join('\n');
+        document.getElementById('uninstall-output').dataset.plain = uninstall;
+        document.getElementById('uninstall-output').innerHTML = highlight(uninstall);
+        document.getElementById('uninstall-section').style.display = 'block';
+
+        setTimeout(function () {
+            document.getElementById('output-section').scrollIntoView({behavior: 'smooth', block: 'start'});
+        }, 80);
+    }
+
+    function showError(msg) {
+        document.getElementById('errors-container').innerHTML =
+            '<div class="alert alert-error">' + esc(msg) + '</div>';
+    }
+
+    function clearAll() {
+        document.getElementById('conf-input').value = '';
+        document.getElementById('errors-container').innerHTML = '';
+        document.getElementById('parsed-section').style.display = 'none';
+        document.getElementById('output-section').style.display = 'none';
+        document.getElementById('uninstall-section').style.display = 'none';
+        document.getElementById('storage-select').value = 'disk1';
+        document.getElementById('storage-custom').style.display = 'none';
+        document.getElementById('storage-custom').value = '';
+        document.getElementById('prefix-select').value = 'awg-proxy';
+        document.getElementById('prefix-custom').style.display = 'none';
+        document.getElementById('prefix-custom').value = '';
+        document.getElementById('conf-input').focus();
+    }
+
+    function copyOutput(preId, btnId) {
+        var plain = document.getElementById(preId).dataset.plain || '';
+        if (!plain) return;
+        var btn = document.getElementById(btnId);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(plain).then(function () {
+                flash(btn);
+            }).catch(function () {
+                fallback(plain, btn);
+            });
+        } else {
+            fallback(plain, btn);
+        }
+    }
+
+    function fallback(text, btn) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+            document.execCommand('copy');
+            flash(btn);
+        } catch (e) {
+        }
+        document.body.removeChild(ta);
+    }
+
+    function flash(btn) {
+        var orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-success');
+        setTimeout(function () {
+            btn.textContent = orig;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-secondary');
+        }, 2000);
+    }
+
+    document.getElementById('conf-input').addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generate();
+    });
+</script>
+</body>
+</html>
