@@ -38,10 +38,11 @@ type Proxy struct {
 	randBuf     []byte     // cyclic random buffer for S4 padding (64KB, c2s goroutine only)
 	randOff     int        // current offset into randBuf
 	rng         fastRand   // xorshift64 PRNG for hot-path (c2s goroutine only)
-	h4Ring      [256]uint32 // pre-computed H4 values for ring buffer
-	h4Idx       uint8       // current index into h4Ring (auto wraps)
-	shutdownMu  sync.Mutex // protects shutdownFDs
-	shutdownFDs []int      // blocking fds to shutdown on stop
+	h4Ring        [256]uint32 // pre-computed H4 values for ring buffer
+	h4Idx         uint8       // current index into h4Ring (auto wraps)
+	handshakeDone atomic.Bool // true after forwarding handshake init; gates transport data
+	shutdownMu    sync.Mutex // protects shutdownFDs
+	shutdownFDs   []int      // blocking fds to shutdown on stop
 }
 
 const randBufSize = 65536 // 64KB cyclic random buffer for S4 padding
@@ -333,6 +334,9 @@ func (p *Proxy) clientToServer(listenConn *net.UDPConn) {
 		// Transport data fast-path: inline transform with pickH4() + fillRand().
 		data := buf[prefix : prefix+n]
 		if n >= WgTransportMinSize && binary.LittleEndian.Uint32(data[:4]) == wgTransportData {
+			if !p.handshakeDone.Load() {
+				continue // drop transport data until handshake completes on this proxy instance
+			}
 			if !p.cfg.h4NoOp {
 				binary.LittleEndian.PutUint32(data[:4], p.pickH4())
 				if prefix > 0 {
@@ -400,8 +404,13 @@ func (p *Proxy) clientToServer(listenConn *net.UDPConn) {
 				continue // reconnect in progress, WG will retransmit
 			}
 			LogError(p.cfg, "remote write: ", err.Error())
-		} else if p.cfg.LogLevel >= LevelDebug {
-			LogDebug(p.cfg, "c->s: transformed ", strconv.Itoa(len(out)), "B sent to server")
+		} else {
+			if sendJunk {
+				p.handshakeDone.Store(true)
+			}
+			if p.cfg.LogLevel >= LevelDebug {
+				LogDebug(p.cfg, "c->s: transformed ", strconv.Itoa(len(out)), "B sent to server")
+			}
 		}
 	}
 }
@@ -429,6 +438,7 @@ func (p *Proxy) serverToClient(listenConn *net.UDPConn, remoteConn *net.UDPConn,
 			p.remoteConn.Store(newConn)
 			setSocketBuffers(newConn, SocketBufSize)
 			p.lastActive.Store(true)
+			p.handshakeDone.Store(false)
 			p.clientAddr.Store(nil)
 			pktCount = 255
 			if p.stopped.Load() {
