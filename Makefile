@@ -54,23 +54,19 @@ docker-all: docker-arm64 docker-arm docker-armv5 docker-amd64
 
 docker-arm64-7.20-docker:
 	@mkdir -p $(BUILD_DIR)
-	VERSION=$(VERSION) scripts/mkdockertar.sh linux arm64 "" $(IMAGE_NAME):$(VERSION)-arm64 $(BUILD_DIR)/$(IMAGE_NAME)-arm64-7.20-Docker.tar
-	gzip -f $(BUILD_DIR)/$(IMAGE_NAME)-arm64-7.20-Docker.tar
+	VERSION=$(VERSION) scripts/mkdockertar.sh linux arm64 "" $(IMAGE_NAME):$(VERSION)-arm64 $(BUILD_DIR)/$(IMAGE_NAME)-arm64-7.20-Docker.tar.gz
 
 docker-arm-7.20-docker:
 	@mkdir -p $(BUILD_DIR)
-	VERSION=$(VERSION) scripts/mkdockertar.sh linux arm 7 $(IMAGE_NAME):$(VERSION)-arm $(BUILD_DIR)/$(IMAGE_NAME)-arm-7.20-Docker.tar
-	gzip -f $(BUILD_DIR)/$(IMAGE_NAME)-arm-7.20-Docker.tar
+	VERSION=$(VERSION) scripts/mkdockertar.sh linux arm 7 $(IMAGE_NAME):$(VERSION)-arm $(BUILD_DIR)/$(IMAGE_NAME)-arm-7.20-Docker.tar.gz
 
 docker-armv5-7.20-docker:
 	@mkdir -p $(BUILD_DIR)
-	VERSION=$(VERSION) scripts/mkdockertar.sh linux arm 5 $(IMAGE_NAME):$(VERSION)-armv5 $(BUILD_DIR)/$(IMAGE_NAME)-armv5-7.20-Docker.tar
-	gzip -f $(BUILD_DIR)/$(IMAGE_NAME)-armv5-7.20-Docker.tar
+	VERSION=$(VERSION) scripts/mkdockertar.sh linux arm 5 $(IMAGE_NAME):$(VERSION)-armv5 $(BUILD_DIR)/$(IMAGE_NAME)-armv5-7.20-Docker.tar.gz
 
 docker-amd64-7.20-docker:
 	@mkdir -p $(BUILD_DIR)
-	VERSION=$(VERSION) scripts/mkdockertar.sh linux amd64 "" $(IMAGE_NAME):$(VERSION)-amd64 $(BUILD_DIR)/$(IMAGE_NAME)-amd64-7.20-Docker.tar
-	gzip -f $(BUILD_DIR)/$(IMAGE_NAME)-amd64-7.20-Docker.tar
+	VERSION=$(VERSION) scripts/mkdockertar.sh linux amd64 "" $(IMAGE_NAME):$(VERSION)-amd64 $(BUILD_DIR)/$(IMAGE_NAME)-amd64-7.20-Docker.tar.gz
 
 docker-all-7.20-docker: docker-arm64-7.20-docker docker-arm-7.20-docker docker-armv5-7.20-docker docker-amd64-7.20-docker
 

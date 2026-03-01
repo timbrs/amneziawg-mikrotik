@@ -76,7 +76,7 @@ func startProxy(t *testing.T, cfg *Config, remoteAddr *net.UDPAddr) (*net.UDPAdd
 	// Give the OS a moment to release the port.
 	time.Sleep(10 * time.Millisecond)
 
-	proxy := NewProxy(cfg, proxyAddr, remoteAddr)
+	proxy := NewProxy(cfg, proxyAddr, remoteAddr, 0)
 	stop := make(chan struct{})
 	done := make(chan struct{})
 

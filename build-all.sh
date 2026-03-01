@@ -27,7 +27,7 @@ echo "--- OCI images ---"
 for spec in "arm64:linux/arm64" "arm:linux/arm/v7" "armv5:linux/arm/v5" "amd64:linux/amd64"; do
   arch="${spec%%:*}"
   platform="${spec#*:}"
-  docker buildx build --platform "$platform" \
+  docker buildx build --no-cache --platform "$platform" \
     --build-arg VERSION="$VERSION" \
     --output "type=oci,dest=$DIR/$IMAGE-$arch.tar" \
     -t "$IMAGE:$VERSION-$arch" . && gzip -f "$DIR/$IMAGE-$arch.tar" &
@@ -41,8 +41,7 @@ echo "--- Classic Docker (7.20) ---"
 declare -A GOARMS=([arm64]="" [arm]="7" [armv5]="5" [amd64]="")
 for arch in arm64 arm armv5 amd64; do
   VERSION=$VERSION scripts/mkdockertar.sh linux "${arch%v5}" "${GOARMS[$arch]}" \
-    "$IMAGE:$VERSION-$arch" "$DIR/$IMAGE-$arch-7.20-Docker.tar" && \
-    gzip -f "$DIR/$IMAGE-$arch-7.20-Docker.tar" &
+    "$IMAGE:$VERSION-$arch" "$DIR/$IMAGE-$arch-7.20-Docker.tar.gz" &
 done
 wait
 echo "Classic Docker images done"

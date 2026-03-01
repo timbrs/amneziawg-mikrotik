@@ -1,7 +1,7 @@
 package awg
 
 import (
-	"io"
+	"encoding/binary"
 	"math/rand/v2"
 	"net"
 	"net/netip"
@@ -30,23 +30,103 @@ type Proxy struct {
 	remoteConn atomic.Pointer[net.UDPConn]
 	stopped    atomic.Bool
 	lastActive atomic.Bool // activity flag; set on recv, cleared by timeout checker
-	cpsCounter uint32      // counter for CPS <c> tags
-	junkBuf    []byte      // pre-allocated: Jc * Jmax bytes for junk generation
-	junkPkts   [][]byte    // pre-allocated: Jc slice headers for junk packets
+	autoSrcPort bool       // auto-mode: take src port from first client packet
+	localPort   atomic.Int32 // desired src port for remote socket (0 = kernel assigns)
+	cpsCounter  uint32     // counter for CPS <c> tags
+	junkBuf     []byte     // pre-allocated: Jc * Jmax bytes for junk generation
+	junkPkts    [][]byte   // pre-allocated: Jc slice headers for junk packets
+	randBuf     []byte     // cyclic random buffer for S4 padding (64KB, c2s goroutine only)
+	randOff     int        // current offset into randBuf
+	rng         fastRand   // xorshift64 PRNG for hot-path (c2s goroutine only)
+	h4Ring      [256]uint32 // pre-computed H4 values for ring buffer
+	h4Idx       uint8       // current index into h4Ring (auto wraps)
+	shutdownMu  sync.Mutex // protects shutdownFDs
+	shutdownFDs []int      // blocking fds to shutdown on stop
 }
 
+const randBufSize = 65536 // 64KB cyclic random buffer for S4 padding
+
 // NewProxy creates a new Proxy instance.
-func NewProxy(cfg *Config, listenAddr, remoteAddr *net.UDPAddr) *Proxy {
+// srcPort: 0 = auto (take from first client packet), >0 = static port.
+func NewProxy(cfg *Config, listenAddr, remoteAddr *net.UDPAddr, srcPort int) *Proxy {
 	p := &Proxy{
 		cfg:        cfg,
 		listenAddr: listenAddr,
 		remoteAddr: remoteAddr,
 	}
+	if srcPort > 0 {
+		p.localPort.Store(int32(srcPort))
+	} else {
+		p.autoSrcPort = true
+	}
 	if cfg.Jc > 0 && cfg.Jmax > 0 {
 		p.junkBuf = make([]byte, cfg.Jc*cfg.Jmax)
 		p.junkPkts = make([][]byte, cfg.Jc)
 	}
+	p.rng = newFastRand()
+	if cfg.S4 > 0 {
+		p.randBuf = make([]byte, randBufSize)
+		p.rng.Fill(p.randBuf)
+	}
+	p.fillH4Ring()
 	return p
+}
+
+// dialRemote dials the remote AWG server, optionally binding to localPort.
+func (p *Proxy) dialRemote() (*net.UDPConn, error) {
+	var local *net.UDPAddr
+	if port := int(p.localPort.Load()); port > 0 {
+		local = &net.UDPAddr{Port: port}
+	}
+	return net.DialUDP("udp4", local, p.remoteAddr)
+}
+
+// fillH4Ring fills the H4 ring buffer with pre-computed values.
+// Called at init and every 256 packets when the ring wraps around.
+func (p *Proxy) fillH4Ring() {
+	if p.cfg.H4.Min == p.cfg.H4.Max {
+		v := p.cfg.H4.Min
+		for i := range p.h4Ring {
+			p.h4Ring[i] = v
+		}
+		return
+	}
+	span := int(p.cfg.H4.Max - p.cfg.H4.Min + 1)
+	for i := range p.h4Ring {
+		p.h4Ring[i] = p.cfg.H4.Min + uint32(p.rng.IntN(span))
+	}
+}
+
+// pickH4 returns the next H4 value from the ring buffer.
+// Refills the ring every 256 calls. Zero-cost per call: one array read + uint8 increment.
+func (p *Proxy) pickH4() uint32 {
+	v := p.h4Ring[p.h4Idx]
+	p.h4Idx++
+	if p.h4Idx == 0 {
+		p.fillH4Ring()
+	}
+	return v
+}
+
+// fillRand copies n bytes from the cyclic random buffer into dst.
+// Refreshes the buffer every full cycle using xorshift64. Used only from c2s goroutine.
+func (p *Proxy) fillRand(dst []byte) {
+	n := len(dst)
+	for n > 0 {
+		avail := randBufSize - p.randOff
+		if avail <= 0 {
+			p.rng.Fill(p.randBuf)
+			p.randOff = 0
+			avail = randBufSize
+		}
+		c := n
+		if c > avail {
+			c = avail
+		}
+		copy(dst[len(dst)-n:], p.randBuf[p.randOff:p.randOff+c])
+		p.randOff += c
+		n -= c
+	}
 }
 
 // generateJunk fills pre-allocated junk buffers with random data and returns
@@ -76,6 +156,26 @@ func (p *Proxy) generateJunk() [][]byte {
 	return p.junkPkts[:p.cfg.Jc]
 }
 
+// registerShutdownFD adds a blocking fd to be shutdown on stop.
+func (p *Proxy) registerShutdownFD(fd int) {
+	p.shutdownMu.Lock()
+	p.shutdownFDs = append(p.shutdownFDs, fd)
+	p.shutdownMu.Unlock()
+}
+
+// removeShutdownFD removes fd from the shutdown list (e.g., on reconnect).
+func (p *Proxy) removeShutdownFD(fd int) {
+	p.shutdownMu.Lock()
+	for i, f := range p.shutdownFDs {
+		if f == fd {
+			p.shutdownFDs[i] = p.shutdownFDs[len(p.shutdownFDs)-1]
+			p.shutdownFDs = p.shutdownFDs[:len(p.shutdownFDs)-1]
+			break
+		}
+	}
+	p.shutdownMu.Unlock()
+}
+
 func setSocketBuffers(conn *net.UDPConn, size int) {
 	conn.SetReadBuffer(size)
 	conn.SetWriteBuffer(size)
@@ -84,10 +184,8 @@ func setSocketBuffers(conn *net.UDPConn, size int) {
 func setSocketBuffersLog(conn *net.UDPConn, size int, cfg *Config, label string) {
 	conn.SetReadBuffer(size)
 	conn.SetWriteBuffer(size)
-	if cfg.LogLevel >= LevelDebug {
-		actualR, actualW := getSocketBufSizes(conn)
-		LogDebug(cfg, label, " socket buf: requested=", strconv.Itoa(size/1024), "KB, actual read=", strconv.Itoa(actualR/1024), "KB write=", strconv.Itoa(actualW/1024), "KB")
-	}
+	actualR, actualW := getSocketBufSizes(conn)
+	LogInfo(cfg, label, " socket buf: requested=", strconv.Itoa(size/1024), "KB, actual read=", strconv.Itoa(actualR/1024), "KB write=", strconv.Itoa(actualW/1024), "KB")
 }
 
 // Run starts the proxy and blocks until stop is called or a fatal error occurs.
@@ -100,11 +198,16 @@ func (p *Proxy) Run(stop <-chan struct{}) error {
 	defer listenConn.Close()
 	setSocketBuffersLog(listenConn, SocketBufSize, p.cfg, "listen")
 
-	remoteConn, err := net.DialUDP("udp4", nil, p.remoteAddr)
+	remoteConn, err := p.dialRemote()
 	if err != nil {
 		return err
 	}
 	setSocketBuffersLog(remoteConn, SocketBufSize, p.cfg, "remote")
+	if port := int(p.localPort.Load()); port > 0 {
+		LogInfo(p.cfg, "src_port=", strconv.Itoa(port))
+	} else {
+		LogInfo(p.cfg, "src_port=auto")
+	}
 
 	p.remoteConn.Store(remoteConn)
 	p.lastActive.Store(true)
@@ -122,6 +225,7 @@ func (p *Proxy) Run(stop <-chan struct{}) error {
 		defer wg.Done()
 		<-stop
 		p.stopped.Store(true)
+		p.shutdownAllFDs()
 		listenConn.Close()
 		if rc := p.remoteConn.Load(); rc != nil {
 			rc.Close()
@@ -212,9 +316,48 @@ func (p *Proxy) clientToServer(listenConn *net.UDPConn) {
 			a := addr
 			p.clientAddr.Store(&a)
 			LogInfo(p.cfg, "client: ", addr.String())
+			if p.autoSrcPort {
+				clientPort := int32(addr.Port())
+				if old := p.localPort.Load(); old != clientPort {
+					p.localPort.Store(clientPort)
+					if rc := p.remoteConn.Load(); rc != nil {
+						LogInfo(p.cfg, "src port: auto ", strconv.Itoa(int(clientPort)), ", reconnecting")
+						rc.Close()
+					}
+				}
+			}
 		}
 
 		currentRemote := p.remoteConn.Load()
+
+		// Transport data fast-path: inline transform with pickH4() + fillRand().
+		data := buf[prefix : prefix+n]
+		if n >= WgTransportMinSize && binary.LittleEndian.Uint32(data[:4]) == wgTransportData {
+			if !p.cfg.h4NoOp {
+				binary.LittleEndian.PutUint32(data[:4], p.pickH4())
+				if prefix > 0 {
+					p.fillRand(buf[:prefix])
+				}
+			}
+			var out []byte
+			if prefix > 0 {
+				out = buf[:prefix+n]
+			} else {
+				out = data
+			}
+			_, err = currentRemote.Write(out)
+			if err != nil {
+				if isClosedErr(err) {
+					continue
+				}
+				LogError(p.cfg, "remote write: ", err.Error())
+			} else if p.cfg.LogLevel >= LevelDebug {
+				LogDebug(p.cfg, "c->s: transport ", strconv.Itoa(len(out)), "B sent")
+			}
+			continue
+		}
+
+		// Handshake slow path: use TransformOutbound.
 		out, sendJunk := TransformOutbound(buf, prefix, n, p.cfg)
 
 		if p.cfg.LogLevel >= LevelDebug {
@@ -355,7 +498,8 @@ func (p *Proxy) reconnectRemote(stop <-chan struct{}, backoff *time.Duration) *n
 		if err != nil {
 			LogError(p.cfg, "resolve: ", err.Error())
 		} else {
-			conn, err := net.DialUDP("udp4", nil, addr)
+			p.remoteAddr = addr
+			conn, err := p.dialRemote()
 			if err == nil {
 				LogInfo(p.cfg, "reconnected to ", addr.String())
 				p.lastActive.Store(true)
@@ -425,9 +569,14 @@ func LogDebug(cfg *Config, parts ...string) {
 }
 
 func writeLog(prefix string, parts []string) {
-	io.WriteString(os.Stderr, prefix)
+	var buf [512]byte
+	n := copy(buf[:], prefix)
 	for _, s := range parts {
-		io.WriteString(os.Stderr, s)
+		n += copy(buf[n:], s)
 	}
-	io.WriteString(os.Stderr, "\n")
+	if n < len(buf) {
+		buf[n] = '\n'
+		n++
+	}
+	os.Stderr.Write(buf[:n])
 }

@@ -40,16 +40,17 @@ func TestRecvmmsgIPv4Family(t *testing.T) {
 		t.Fatal("write: ", err)
 	}
 
-	// Receive via recvBatch.
-	raw, err := listenConn.SyscallConn()
+	// Receive via recvBatchFD (blocking raw fd).
+	fd, err := dupBlockingFD(listenConn)
 	if err != nil {
-		t.Fatal("syscall conn: ", err)
+		t.Fatal("dup fd: ", err)
 	}
+	defer syscall.Close(fd)
 
 	bs := new(batchState)
-	bs.initRecv(true)
+	bs.initRecv(true, 0)
 
-	nRecv, err := recvBatch(raw, bs)
+	nRecv, err := recvBatchFD(fd, bs)
 	if err != nil {
 		t.Fatal("recvBatch: ", err)
 	}

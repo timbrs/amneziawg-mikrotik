@@ -871,7 +871,7 @@ func TestProxyGracefulShutdown(t *testing.T) {
 	tmpConn.Close()
 	time.Sleep(10 * time.Millisecond)
 
-	proxy := NewProxy(cfg, proxyAddr, mockAddr)
+	proxy := NewProxy(cfg, proxyAddr, mockAddr, 0)
 	stop := make(chan struct{})
 	done := make(chan struct{})
 
@@ -928,7 +928,7 @@ func startProxyWildcard(t *testing.T, cfg *Config, remoteAddr *net.UDPAddr) (*ne
 	// Use nil IP (wildcard) for proxy listen address.
 	proxyListenAddr := &net.UDPAddr{Port: actualPort}
 
-	proxy := NewProxy(cfg, proxyListenAddr, remoteAddr)
+	proxy := NewProxy(cfg, proxyListenAddr, remoteAddr, 0)
 	stop := make(chan struct{})
 	done := make(chan struct{})
 

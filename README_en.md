@@ -177,9 +177,10 @@ The obfuscation parameters (`Jc`, `Jmin`, `Jmax`, `S1`, `S2`, `H1`--`H4`) are in
 | `AWG_S3` | No | Cookie reply padding bytes (v2) |
 | `AWG_S4` | No | Transport data padding bytes (v2) |
 | `AWG_I1`--`AWG_I5` | No | CPS templates (v1.5/v2); up to 5 templates |
+| `AWG_SRC_PORT` | No | Source port for connecting to the server. Not set or `0` -- auto mode: port is taken from the first client (MikroTik WG) packet. `1`--`65535` -- static port. Used for NAT hole punching: the proxy connects to the server with the same src port as MikroTik, allowing a later switch to a direct connection without the proxy (default: auto) |
 | `AWG_TIMEOUT` | No | Inactivity timeout in seconds (default: 180) |
 | `AWG_LOG_LEVEL` | No | `none`, `error`, `info`, `debug` (default: `info`) |
-| `AWG_SOCKET_BUF` | No | Socket buffer size in bytes (default: 16 MB) |
+| `AWG_SOCKET_BUF` | No | Socket buffer size in bytes (default: `16777216` = 16 MB) |
 | `AWG_GOMAXPROCS` | No | Number of Go threads (default: 2) |
 
 The protocol version is detected automatically: **v2** if S3/S4 are set or H values are ranges, **v1.5** if CPS templates (I1-I5) are set, otherwise **v1**.

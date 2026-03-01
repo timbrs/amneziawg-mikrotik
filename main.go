@@ -7,7 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"strconv"
+	"runtime/debug"
+"strconv"
 	"strings"
 	"syscall"
 
@@ -43,7 +44,7 @@ func main() {
 		}
 	}
 
-	maxProcs := 2
+	maxProcs := 3
 	if v := os.Getenv("AWG_GOMAXPROCS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			maxProcs = n
@@ -51,8 +52,31 @@ func main() {
 	}
 	runtime.GOMAXPROCS(maxProcs)
 
+	if v := os.Getenv("AWG_GOGC"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			debug.SetGCPercent(n)
+		}
+	} else {
+		debug.SetGCPercent(-1) // disable GC — memory bounded by design
+	}
+
+	var srcPort int
+	if v := os.Getenv("AWG_SRC_PORT"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 || n > 65535 {
+			_, _ = io.WriteString(os.Stderr, "FATAL: AWG_SRC_PORT: expected 0-65535\n")
+			os.Exit(1)
+		}
+		srcPort = n
+	}
+
+	srcPortLabel := "auto"
+	if srcPort > 0 {
+		srcPortLabel = strconv.Itoa(srcPort)
+	}
+
 	awg.LogInfo(cfg, "awg-proxy ", version, " ", runtime.GOOS, "/", runtime.GOARCH, " mode=", mode)
-	awg.LogInfo(cfg, "listen=", listenAddr.String(), " remote=", remoteAddr.String())
+	awg.LogInfo(cfg, "listen=", listenAddr.String(), " remote=", remoteAddr.String(), " src_port=", srcPortLabel)
 	awg.LogInfo(cfg, "GOMAXPROCS=", strconv.Itoa(maxProcs))
 	awg.LogInfo(cfg, "config: S1=", strconv.Itoa(cfg.S1), " S2=", strconv.Itoa(cfg.S2),
 		" S3=", strconv.Itoa(cfg.S3), " S4=", strconv.Itoa(cfg.S4))
@@ -61,7 +85,7 @@ func main() {
 	awg.LogInfo(cfg, "config: initTotal=", strconv.Itoa(cfg.S1+148),
 		" respTotal=", strconv.Itoa(cfg.S2+92), " cookieTotal=", strconv.Itoa(cfg.S3+64))
 
-	proxy := awg.NewProxy(cfg, listenAddr, remoteAddr)
+	proxy := awg.NewProxy(cfg, listenAddr, remoteAddr, srcPort)
 
 	stop := make(chan struct{})
 	sigCh := make(chan os.Signal, 1)

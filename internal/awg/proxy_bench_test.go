@@ -51,7 +51,7 @@ func startBenchProxy(b *testing.B, cfg *Config, remoteAddr *net.UDPAddr) (*net.U
 
 	time.Sleep(10 * time.Millisecond)
 
-	proxy := NewProxy(cfg, proxyAddr, remoteAddr)
+	proxy := NewProxy(cfg, proxyAddr, remoteAddr, 0)
 	stop := make(chan struct{})
 	done := make(chan struct{})
 

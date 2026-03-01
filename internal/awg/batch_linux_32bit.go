@@ -24,7 +24,19 @@ type mmsghdr struct {
 	Len uint32
 }
 
-const mmsghdrSize = unsafe.Sizeof(mmsghdr{})
+type cmsghdr struct {
+	Len   uint32
+	Level int32
+	Type  int32
+}
 
-func setIovecLen(iov *iovec, n uint64) { iov.Len = uint32(n) }
-func setIovlen(hdr *msghdr, n uint64)  { hdr.Iovlen = uint32(n) }
+const (
+	mmsghdrSize = unsafe.Sizeof(mmsghdr{})
+	cmsgAlign   = 4
+)
+
+func setIovecLen(iov *iovec, n uint64)       { iov.Len = uint32(n) }
+func setIovlen(hdr *msghdr, n uint64)        { hdr.Iovlen = uint32(n) }
+func setControllen(hdr *msghdr, n uint64)    { hdr.Controllen = uint32(n) }
+func getControllen(hdr *msghdr) int          { return int(hdr.Controllen) }
+func setCmsghdrLen(cmsg *cmsghdr, n int)     { cmsg.Len = uint32(n) }

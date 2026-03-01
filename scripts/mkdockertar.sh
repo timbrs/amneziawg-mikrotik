@@ -58,8 +58,8 @@ REPO="${TAG%%:*}"
 RTAG="${TAG#*:}"
 printf '{"%s":{"%s":"%s"}}' "$REPO" "$RTAG" "$CONFIG_SHA" > "$WORK/out/repositories"
 
-# --- 6. Pack final tar (no ./ prefix — RouterOS requires exact "manifest.json") ---
+# --- 6. Pack final tar.gz (no ./ prefix — RouterOS requires exact "manifest.json") ---
 ABS_OUTPUT="$(cd "$(dirname "$OUTPUT")" && pwd)/$(basename "$OUTPUT")"
-(cd "$WORK/out" && tar cf "$ABS_OUTPUT" *)
+(cd "$WORK/out" && tar czf "$ABS_OUTPUT" *)
 
 echo "Created $OUTPUT ($(du -h "$OUTPUT" | cut -f1))"
