@@ -399,6 +399,9 @@ func (p *Proxy) clientToServerBatch(listenConn *net.UDPConn) {
 			if n >= WgTransportMinSize {
 				h := binary.LittleEndian.Uint32(data[:4])
 				if h == wgTransportData {
+					if !p.handshakeDone.Load() {
+						continue // drop transport data until handshake completes
+					}
 					binary.LittleEndian.PutUint32(data[:4], p.pickH4())
 					if prefix > 0 {
 						p.fillRand(recvBS.bufs[i][:prefix])
@@ -422,7 +425,7 @@ func (p *Proxy) clientToServerBatch(listenConn *net.UDPConn) {
 				LogDebug(cfg, "c->s batch: recv ", strconv.Itoa(n), "B, send ", strconv.Itoa(len(out)), "B, junk=", strconv.FormatBool(sendJunk))
 			}
 
-			if sendJunk {
+			if sendJunk && !p.handshakeDone.Load() {
 				LogDebug(cfg, "c->s: handshake init ", strconv.Itoa(n), "B -> ", strconv.Itoa(len(out)), "B")
 				cpsPackets := GenerateCPSPackets(cfg.CPS, &p.cpsCounter)
 				for _, pkt := range cpsPackets {
@@ -432,8 +435,12 @@ func (p *Proxy) clientToServerBatch(listenConn *net.UDPConn) {
 				for _, junk := range junkPackets {
 					sendSinglePacketFD(sendFD, junk, sendSS)
 				}
-				sendSinglePacketFD(sendFD, out, sendSS)
+				if err := sendSinglePacketFD(sendFD, out, sendSS); err == nil {
+					p.handshakeDone.Store(true)
+				}
 				continue
+			} else if sendJunk {
+				LogDebug(cfg, "c->s: rekey, skipping junk")
 			}
 
 			// Non-junk handshake: point iovec directly at out (valid until next recvBatchFD).
@@ -608,6 +615,7 @@ func (p *Proxy) serverToClientBatch(listenConn *net.UDPConn, remoteConn *net.UDP
 				useGRO = enableGRO(recvFD)
 			}
 			p.lastActive.Store(true)
+			p.handshakeDone.Store(false)
 			p.clientAddr.Store(nil)
 			pktCount = 255
 			addrCached = false
