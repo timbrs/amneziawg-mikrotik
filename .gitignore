@@ -1,3 +1,5 @@
 .idea/
 /builds/
 /tests/
+*.md
+*.json

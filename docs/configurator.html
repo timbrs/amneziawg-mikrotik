@@ -60,6 +60,30 @@
             font-size: 0.95rem;
         }
 
+        .header-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        #lang-toggle {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 4px 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text);
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+
+        #lang-toggle:hover {
+            background: #e5e7eb;
+        }
+
         .card {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -128,6 +152,25 @@
         #storage-custom, #prefix-custom {
             margin-left: 8px;
             width: 160px;
+        }
+
+        #proxy-ip {
+            width: 200px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .radio-group label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 400;
+            cursor: pointer;
+            font-size: 0.875rem;
         }
 
         .btn {
@@ -267,7 +310,7 @@
             margin-bottom: 4px;
         }
 
-        #parsed-section, #output-section, #uninstall-section {
+        #parsed-section, #output-section, #routing-section, #uninstall-section {
             display: none;
         }
 
@@ -276,6 +319,64 @@
             color: var(--text-muted);
             font-size: 0.8rem;
             margin-top: 40px;
+        }
+
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .checkbox-grid label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 400;
+            cursor: pointer;
+            font-size: 0.82rem;
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: background 0.1s;
+        }
+
+        .checkbox-grid label:hover {
+            background: #f3f4f6;
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+        }
+
+        .scenario-panel {
+            margin-top: 10px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .scenario-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .alert-warning {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            color: #92400e;
+        }
+
+        .hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
         }
 
         @media (max-width: 600px) {
@@ -298,80 +399,303 @@
 <div class="container">
 
     <header>
-        <h1>AWG Proxy &mdash; MikroTik Offline Command Generator</h1>
-        <p>Paste your AmneziaWG .conf file contents to generate ready-to-use MikroTik RouterOS commands</p>
+        <div class="header-row">
+            <div>
+                <h1 data-i18n="title">AWG Proxy &mdash; MikroTik Offline Command Generator</h1>
+                <p data-i18n="subtitle">Paste your AmneziaWG .conf file contents to generate ready-to-use MikroTik RouterOS commands</p>
+            </div>
+            <button id="lang-toggle" onclick="setLang(currentLang==='ru'?'en':'ru')">EN</button>
+        </div>
     </header>
 
     <div class="card">
-        <div class="card-title">AmneziaWG Configuration File</div>
-        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
-            All configuration and data is processed locally in your browser. Nothing is transmitted anywhere. Your private keys are safe.<br>
-            Вся конфигурация и все данные обрабатываются локально в вашем браузере. Ничего никуда не передается. Ваши приватные ключи в безопасности.
-        </p>
-        <label for="conf-input">.conf file contents</label>
+        <div class="card-title" data-i18n="confTitle">AmneziaWG Configuration File</div>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5" data-i18n="privacy">All configuration and data is processed locally in your browser. Nothing is transmitted anywhere. Your private keys are safe.</p>
+        <label for="conf-input" data-i18n="confLabel">.conf file contents</label>
         <textarea id="conf-input"
                   placeholder="[Interface]&#10;PrivateKey = ...&#10;Address = 10.1.1.1/32&#10;DNS = 1.1.1.1&#10;Jc = 2&#10;Jmin = 1&#10;Jmax = 500&#10;S1 = 123&#10;S2 = 12&#10;H1 = 12345&#10;...&#10;&#10;[Peer]&#10;PublicKey = ...&#10;Endpoint = 1.2.3.4:12345&#10;AllowedIPs = 0.0.0.0/0"></textarea>
         <div style="margin-top:14px">
-            <label for="storage-select">Container storage</label>
+            <label data-i18n="modeLabel">Deployment mode</label>
+            <div class="radio-group">
+                <label><input type="radio" name="deploy-mode" value="container" checked onchange="onModeChange()"> <span data-i18n="modeContainer">MikroTik + Container (Docker)</span></label>
+                <label><input type="radio" name="deploy-mode" value="standalone" onchange="onModeChange()"> <span data-i18n="modeStandalone">MikroTik + Server (Standalone)</span></label>
+            </div>
+            <div id="mode-hint" class="hint" data-i18n="modeContainerHint">WireGuard client on MikroTik + awg-proxy runs inside a Docker container directly on the router</div>
+        </div>
+        <div id="scenario-row" style="margin-top:14px">
+            <label data-i18n="scenarioLabel">Routing scenario</label>
+            <div class="radio-group">
+                <label><input type="radio" name="scenario" value="tunnel" checked onchange="onScenarioChange()"> <span data-i18n="scenarioTunnel">Tunnel only (manual routes)</span></label>
+                <label><input type="radio" name="scenario" value="dns-fwd" onchange="onScenarioChange()"> <span data-i18n="scenarioDns">DNS-based routing for services</span></label>
+                <label><input type="radio" name="scenario" value="non-ru" onchange="onScenarioChange()"> <span data-i18n="scenarioNonRu">All non-RU traffic through tunnel</span></label>
+            </div>
+            <div id="scenario-hint" class="hint" data-i18n="scenarioTunnelHint">You configure routes manually via /ip/route or other methods. For advanced users.</div>
+        </div>
+        <div id="fasttrack-warn" class="alert alert-warning" style="display:none;margin-top:8px" data-i18n="warnFasttrack">Fasttrack rules will be disabled for routing to work correctly. Uninstall script restores them.</div>
+        <div id="services-panel" style="display:none" class="scenario-panel">
+            <div class="scenario-panel-header">
+                <label style="margin-bottom:0" data-i18n="servicesLabel">Services to route through tunnel</label>
+                <div>
+                    <button class="btn btn-secondary btn-sm" onclick="toggleAllServices(true)" data-i18n="btnSelectAll">Select all</button>
+                    <button class="btn btn-secondary btn-sm" onclick="toggleAllServices(false)" data-i18n="btnDeselectAll">Deselect all</button>
+                </div>
+            </div>
+            <div id="services-grid" class="checkbox-grid"></div>
+        </div>
+        <div id="exclusions-panel" style="display:none" class="scenario-panel">
+            <div class="scenario-panel-header">
+                <label style="margin-bottom:0" data-i18n="exclusionsLabel">Exclude from tunnel (keep direct)</label>
+            </div>
+            <div id="exclusions-grid" class="checkbox-grid"></div>
+        </div>
+        <div id="storage-row" style="margin-top:14px">
+            <label for="storage-select" data-i18n="storageLabel">Container storage</label>
             <select id="storage-select">
-                <option value="disk1">disk1/ — internal storage (default)</option>
-                <option value="usb1">usb1/ — USB flash drive (common)</option>
-                <option value="usb1-part1">usb1-part1/ — USB partition</option>
-                <option value="usb2">usb2/ — USB flash drive (2nd)</option>
-                <option value="sd1">sd1/ — SD / microSD card</option>
-                <option value="nvme1">nvme1/ — NVMe SSD</option>
-                <option value="sata1">sata1/ — SATA drive</option>
-                <option value="__custom">Custom...</option>
+                <option value="__auto" data-i18n="sAuto">Auto (usb1/ &rarr; disk1/)</option>
+                <option value="disk1" data-i18n="sDisk1">disk1/ &mdash; internal storage (default)</option>
+                <option value="usb1" data-i18n="sUsb1">usb1/ &mdash; USB flash drive (common)</option>
+                <option value="usb1-part1" data-i18n="sUsb1p">usb1-part1/ &mdash; USB partition</option>
+                <option value="usb2" data-i18n="sUsb2">usb2/ &mdash; USB flash drive (2nd)</option>
+                <option value="sd1" data-i18n="sSd1">sd1/ &mdash; SD / microSD card</option>
+                <option value="nvme1" data-i18n="sNvme1">nvme1/ &mdash; NVMe SSD</option>
+                <option value="sata1" data-i18n="sSata1">sata1/ &mdash; SATA drive</option>
+                <option value="__custom" data-i18n="sCustom">Custom...</option>
             </select>
             <input type="text" id="storage-custom" placeholder="e.g. sata1-part1" style="display:none">
         </div>
+        <div id="proxy-ip-row" style="margin-top:14px;display:none">
+            <label for="proxy-ip" data-i18n="proxyIpLabel">Proxy device IP address</label>
+            <input type="text" id="proxy-ip" placeholder="e.g. 192.168.1.100" data-i18n-ph="proxyIpPh">
+        </div>
         <div style="margin-top:14px">
-            <label for="prefix-select">Tunnel name (prefix)</label>
+            <label for="prefix-select" data-i18n="prefixLabel">Tunnel name (prefix)</label>
             <select id="prefix-select">
-                <option value="awg-proxy">awg-proxy — 1st tunnel (default)</option>
-                <option value="awg-proxy-2">awg-proxy-2 — 2nd tunnel</option>
-                <option value="awg-proxy-3">awg-proxy-3 — 3rd tunnel</option>
-                <option value="awg-proxy-4">awg-proxy-4 — 4th tunnel</option>
-                <option value="__custom">Custom...</option>
+                <option value="awg-proxy" data-i18n="pAwg1">awg-proxy &mdash; 1st tunnel (default)</option>
+                <option value="awg-proxy-2" data-i18n="pAwg2">awg-proxy-2 &mdash; 2nd tunnel</option>
+                <option value="awg-proxy-3" data-i18n="pAwg3">awg-proxy-3 &mdash; 3rd tunnel</option>
+                <option value="awg-proxy-4" data-i18n="pAwg4">awg-proxy-4 &mdash; 4th tunnel</option>
+                <option value="__custom" data-i18n="pCustom">Custom...</option>
             </select>
             <input type="text" id="prefix-custom" placeholder="e.g. awg-office" style="display:none">
+            <div class="hint" data-i18n="prefixHint">Change the prefix only if you need 2+ tunnels with different routing rules</div>
         </div>
         <div class="actions">
-            <button class="btn btn-primary" onclick="generate()">Generate commands</button>
-            <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+            <button class="btn btn-primary" id="btn-generate" onclick="generate()" data-i18n="btnGenerate">Generate commands</button>
+            <button class="btn btn-secondary" onclick="clearAll()" data-i18n="btnClear">Clear</button>
         </div>
     </div>
 
     <div id="errors-container"></div>
 
     <div id="parsed-section" class="card">
-        <div class="card-title">Parsed parameters</div>
+        <div class="card-title" data-i18n="parsedTitle">Parsed parameters</div>
         <div id="fields-display"></div>
     </div>
 
     <div id="output-section" class="card">
         <div class="output-header">
-            <div class="card-title" style="margin-bottom:0">MikroTik RouterOS Commands</div>
-            <button class="btn btn-secondary" id="copy-btn" onclick="copyOutput('output','copy-btn')">Copy all</button>
+            <div class="card-title" style="margin-bottom:0" data-i18n="outputTitle">MikroTik RouterOS Commands</div>
+            <button class="btn btn-secondary" id="copy-btn" onclick="copyOutput('output','copy-btn')" data-i18n="btnCopy">Copy all</button>
         </div>
         <pre id="output"></pre>
     </div>
 
+    <div id="routing-section" class="card" style="display:none">
+        <div class="output-header">
+            <div class="card-title" style="margin-bottom:0" data-i18n="routingTitle">Step 2: Routing Setup</div>
+            <button class="btn btn-secondary" id="copy-routing-btn" onclick="copyOutput('routing-output','copy-routing-btn')" data-i18n="btnCopyRouting">Copy routing</button>
+        </div>
+        <div class="alert-warning" data-i18n="routingNote">Paste this AFTER Step 1 completes (wait for "Installation complete!").</div>
+        <pre id="routing-output"></pre>
+    </div>
+
     <div id="uninstall-section" class="card">
         <div class="output-header">
-            <div class="card-title" style="margin-bottom:0">Uninstall Commands</div>
+            <div class="card-title" style="margin-bottom:0" data-i18n="uninstallTitle">Uninstall Commands</div>
             <button class="btn btn-secondary" id="copy-uninstall-btn"
-                    onclick="copyOutput('uninstall-output','copy-uninstall-btn')">Copy uninstall
-            </button>
+                    onclick="copyOutput('uninstall-output','copy-uninstall-btn')" data-i18n="btnCopyUn">Copy uninstall</button>
         </div>
         <pre id="uninstall-output"></pre>
     </div>
 
-    <footer>Works entirely offline &mdash; no data leaves your browser.</footer>
+    <footer data-i18n="footer">Works entirely offline &mdash; no data leaves your browser.</footer>
 </div>
 
 <script>
     'use strict';
+
+    // ============================================================
+    // i18n
+    // ============================================================
+    var currentLang = (function() {
+        try { var s = localStorage.getItem('awg-lang'); if (s === 'ru' || s === 'en') return s; } catch(e) {}
+        return (navigator.language && navigator.language.slice(0,2) === 'ru') ? 'ru' : 'en';
+    })();
+
+    var REPO = (function() {
+        var h = location.hostname, p = location.pathname.split('/')[1] || '';
+        var m = h.match(/^([^.]+)\.(github|gitlab)\.io$/);
+        if (m) {
+            var base = 'https://' + (m[2] === 'github' ? 'github.com' : 'gitlab.com') + '/' + m[1] + '/' + p;
+            var dl = m[2] === 'gitlab'
+                ? base + '/-/releases/permalink/latest/downloads/'
+                : base + '/releases/latest/download/';
+            return { base: base, dl: dl };
+        }
+        return {
+            base: 'https://github.com/timbrs/amneziawg-mikrotik',
+            dl: 'https://github.com/timbrs/amneziawg-mikrotik/releases/latest/download/'
+        };
+    })();
+
+    var I18N = {
+        en: {
+            title: 'AWG Proxy \u2014 MikroTik Offline Command Generator',
+            subtitle: 'Paste your AmneziaWG .conf file contents to generate ready-to-use MikroTik RouterOS commands',
+            privacy: 'All configuration and data is processed locally in your browser. Nothing is transmitted anywhere. Your private keys are safe.',
+            confTitle: 'AmneziaWG Configuration File',
+            confLabel: '.conf file contents',
+            modeLabel: 'Deployment mode',
+            modeContainer: 'MikroTik + Container (Docker)',
+            modeStandalone: 'MikroTik + Server (Standalone)',
+            storageLabel: 'Container storage',
+            proxyIpLabel: 'Proxy device IP address',
+            proxyIpPh: 'e.g. 192.168.1.100',
+            prefixLabel: 'Tunnel name (prefix)',
+            btnGenerate: 'Generate commands',
+            btnClear: 'Clear',
+            parsedTitle: 'Parsed parameters',
+            outputTitle: 'Step 1: Install AWG Proxy',
+            btnCopy: 'Copy all',
+            routingTitle: 'Step 2: Routing Setup',
+            btnCopyRouting: 'Copy routing',
+            routingNote: 'Paste this AFTER Step 1 completes (wait for "Installation complete!").',
+            uninstallTitle: 'Uninstall Commands',
+            btnCopyUn: 'Copy uninstall',
+            footer: 'Works entirely offline \u2014 no data leaves your browser.',
+            errEmpty: 'Configuration field is empty. Paste the contents of your .conf file.',
+            errPrefix: 'Invalid tunnel prefix: only letters, digits, and hyphens allowed (1-30 chars, cannot start/end with hyphen).',
+            errProxyIp: 'Invalid proxy device IP address.',
+            errTitle: 'Errors:',
+            ifaceSec: '[Interface] section',
+            peerSec: '[Peer] section',
+            copied: 'Copied!',
+            sDisk1: 'disk1/ \u2014 internal storage (default)',
+            sUsb1: 'usb1/ \u2014 USB flash drive (common)',
+            sUsb1p: 'usb1-part1/ \u2014 USB partition',
+            sUsb2: 'usb2/ \u2014 USB flash drive (2nd)',
+            sSd1: 'sd1/ \u2014 SD / microSD card',
+            sNvme1: 'nvme1/ \u2014 NVMe SSD',
+            sSata1: 'sata1/ \u2014 SATA drive',
+            sCustom: 'Custom...',
+            pAwg1: 'awg-proxy \u2014 1st tunnel (default)',
+            pAwg2: 'awg-proxy-2 \u2014 2nd tunnel',
+            pAwg3: 'awg-proxy-3 \u2014 3rd tunnel',
+            pAwg4: 'awg-proxy-4 \u2014 4th tunnel',
+            pCustom: 'Custom...',
+            scenarioLabel: 'Routing scenario',
+            scenarioTunnel: 'Tunnel only (manual routes)',
+            scenarioDns: 'DNS-based routing for services',
+            scenarioNonRu: 'All non-RU traffic through tunnel',
+            servicesLabel: 'Services to route through tunnel',
+            exclusionsLabel: 'Exclude from tunnel (keep direct)',
+            btnSelectAll: 'Select all',
+            btnDeselectAll: 'Deselect all',
+            sAuto: 'Auto (usb1/ \u2192 disk1/)',
+            warnFasttrack: 'Fasttrack rules will be disabled for routing to work correctly. Uninstall script restores them.',
+            noServiceSelected: 'Select at least one service.',
+            modeContainerHint: 'WireGuard client on MikroTik + awg-proxy runs inside a Docker container directly on the router',
+            modeStandaloneHint: 'WireGuard client on MikroTik + awg-proxy runs on a separate device (Raspberry Pi, VPS, or another server)',
+            scenarioTunnelHint: 'You configure routes manually via /ip/route or other methods. For advanced users.',
+            scenarioDnsHint: 'Routes traffic to selected services through the tunnel using DNS forwarding rules. Works best on a clean (reset) configuration.',
+            scenarioNonRuHint: 'All traffic goes through the tunnel except Russian IP ranges (auto-updated daily). Works best on a clean (reset) configuration.',
+            prefixHint: 'Change the prefix only if you need 2+ tunnels with different routing rules'
+        },
+        ru: {
+            title: 'AWG Proxy \u2014 \u041e\u0444\u043b\u0430\u0439\u043d-\u0433\u0435\u043d\u0435\u0440\u0430\u0442\u043e\u0440 \u043a\u043e\u043c\u0430\u043d\u0434 MikroTik',
+            subtitle: '\u0412\u0441\u0442\u0430\u0432\u044c\u0442\u0435 \u0441\u043e\u0434\u0435\u0440\u0436\u0438\u043c\u043e\u0435 .conf \u0444\u0430\u0439\u043b\u0430 AmneziaWG \u0434\u043b\u044f \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438 \u043a\u043e\u043c\u0430\u043d\u0434 MikroTik RouterOS',
+            privacy: '\u0412\u0441\u044f \u043a\u043e\u043d\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u044f \u0438 \u0434\u0430\u043d\u043d\u044b\u0435 \u043e\u0431\u0440\u0430\u0431\u0430\u0442\u044b\u0432\u0430\u044e\u0442\u0441\u044f \u043b\u043e\u043a\u0430\u043b\u044c\u043d\u043e \u0432 \u0432\u0430\u0448\u0435\u043c \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435. \u041d\u0438\u0447\u0435\u0433\u043e \u043d\u0438\u043a\u0443\u0434\u0430 \u043d\u0435 \u043f\u0435\u0440\u0435\u0434\u0430\u0451\u0442\u0441\u044f. \u0412\u0430\u0448\u0438 \u043f\u0440\u0438\u0432\u0430\u0442\u043d\u044b\u0435 \u043a\u043b\u044e\u0447\u0438 \u0432 \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u0438.',
+            confTitle: '\u041a\u043e\u043d\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u043e\u043d\u043d\u044b\u0439 \u0444\u0430\u0439\u043b AmneziaWG',
+            confLabel: '\u0421\u043e\u0434\u0435\u0440\u0436\u0438\u043c\u043e\u0435 .conf \u0444\u0430\u0439\u043b\u0430',
+            modeLabel: '\u0420\u0435\u0436\u0438\u043c \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0438',
+            modeContainer: 'MikroTik + \u041a\u043e\u043d\u0442\u0435\u0439\u043d\u0435\u0440 (Docker)',
+            modeStandalone: 'MikroTik + \u0421\u0435\u0440\u0432\u0435\u0440 (Standalone)',
+            storageLabel: '\u0425\u0440\u0430\u043d\u0438\u043b\u0438\u0449\u0435 \u043a\u043e\u043d\u0442\u0435\u0439\u043d\u0435\u0440\u0430',
+            proxyIpLabel: 'IP-\u0430\u0434\u0440\u0435\u0441 \u043f\u0440\u043e\u043a\u0441\u0438-\u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u0430',
+            proxyIpPh: '\u043d\u0430\u043f\u0440. 192.168.1.100',
+            prefixLabel: '\u0418\u043c\u044f \u0442\u0443\u043d\u043d\u0435\u043b\u044f (\u043f\u0440\u0435\u0444\u0438\u043a\u0441)',
+            btnGenerate: '\u0421\u0433\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c',
+            btnClear: '\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c',
+            parsedTitle: '\u0420\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u043d\u043d\u044b\u0435 \u043f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\u044b',
+            outputTitle: '\u0428\u0430\u0433 1: \u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 AWG Proxy',
+            btnCopy: '\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c',
+            routingTitle: '\u0428\u0430\u0433 2: \u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430 \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u0438\u0437\u0430\u0446\u0438\u0438',
+            btnCopyRouting: '\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c',
+            routingNote: '\u0412\u0441\u0442\u0430\u0432\u044c\u0442\u0435 \u042d\u0422\u041e \u041f\u041e\u0421\u041b\u0415 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0438\u044f \u0428\u0430\u0433\u0430 1 (\u0434\u043e\u0436\u0434\u0438\u0442\u0435\u0441\u044c "Installation complete!").',
+            uninstallTitle: '\u041a\u043e\u043c\u0430\u043d\u0434\u044b \u0443\u0434\u0430\u043b\u0435\u043d\u0438\u044f',
+            btnCopyUn: '\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c',
+            footer: '\u0420\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u043f\u043e\u043b\u043d\u043e\u0441\u0442\u044c\u044e \u043e\u0444\u043b\u0430\u0439\u043d \u2014 \u0434\u0430\u043d\u043d\u044b\u0435 \u043d\u0435 \u043f\u043e\u043a\u0438\u0434\u0430\u044e\u0442 \u0432\u0430\u0448 \u0431\u0440\u0430\u0443\u0437\u0435\u0440.',
+            errEmpty: '\u041f\u043e\u043b\u0435 \u043a\u043e\u043d\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u0438 \u043f\u0443\u0441\u0442\u043e\u0435. \u0412\u0441\u0442\u0430\u0432\u044c\u0442\u0435 \u0441\u043e\u0434\u0435\u0440\u0436\u0438\u043c\u043e\u0435 .conf \u0444\u0430\u0439\u043b\u0430.',
+            errPrefix: '\u041d\u0435\u0434\u043e\u043f\u0443\u0441\u0442\u0438\u043c\u044b\u0439 \u043f\u0440\u0435\u0444\u0438\u043a\u0441: \u0442\u043e\u043b\u044c\u043a\u043e \u0431\u0443\u043a\u0432\u044b, \u0446\u0438\u0444\u0440\u044b \u0438 \u0434\u0435\u0444\u0438\u0441\u044b (1-30 \u0441\u0438\u043c\u0432\u043e\u043b\u043e\u0432, \u043d\u0435 \u043c\u043e\u0436\u0435\u0442 \u043d\u0430\u0447\u0438\u043d\u0430\u0442\u044c\u0441\u044f/\u0437\u0430\u043a\u0430\u043d\u0447\u0438\u0432\u0430\u0442\u044c\u0441\u044f \u0434\u0435\u0444\u0438\u0441\u043e\u043c).',
+            errProxyIp: '\u041d\u0435\u0434\u043e\u043f\u0443\u0441\u0442\u0438\u043c\u044b\u0439 IP-\u0430\u0434\u0440\u0435\u0441 \u043f\u0440\u043e\u043a\u0441\u0438-\u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u0430.',
+            errTitle: '\u041e\u0448\u0438\u0431\u043a\u0438:',
+            ifaceSec: '\u0421\u0435\u043a\u0446\u0438\u044f [Interface]',
+            peerSec: '\u0421\u0435\u043a\u0446\u0438\u044f [Peer]',
+            copied: '\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u043e!',
+            sDisk1: 'disk1/ \u2014 \u0432\u043d\u0443\u0442\u0440\u0435\u043d\u043d\u0435\u0435 \u0445\u0440\u0430\u043d\u0438\u043b\u0438\u0449\u0435 (\u043f\u043e \u0443\u043c\u043e\u043b\u0447.)',
+            sUsb1: 'usb1/ \u2014 USB-\u043d\u0430\u043a\u043e\u043f\u0438\u0442\u0435\u043b\u044c',
+            sUsb1p: 'usb1-part1/ \u2014 USB \u0440\u0430\u0437\u0434\u0435\u043b',
+            sUsb2: 'usb2/ \u2014 USB-\u043d\u0430\u043a\u043e\u043f\u0438\u0442\u0435\u043b\u044c (2-\u0439)',
+            sSd1: 'sd1/ \u2014 SD / microSD \u043a\u0430\u0440\u0442\u0430',
+            sNvme1: 'nvme1/ \u2014 NVMe SSD',
+            sSata1: 'sata1/ \u2014 SATA \u0434\u0438\u0441\u043a',
+            sCustom: '\u0414\u0440\u0443\u0433\u043e\u0435...',
+            pAwg1: 'awg-proxy \u2014 1-\u0439 \u0442\u0443\u043d\u043d\u0435\u043b\u044c (\u043f\u043e \u0443\u043c\u043e\u043b\u0447.)',
+            pAwg2: 'awg-proxy-2 \u2014 2-\u0439 \u0442\u0443\u043d\u043d\u0435\u043b\u044c',
+            pAwg3: 'awg-proxy-3 \u2014 3-\u0439 \u0442\u0443\u043d\u043d\u0435\u043b\u044c',
+            pAwg4: 'awg-proxy-4 \u2014 4-\u0439 \u0442\u0443\u043d\u043d\u0435\u043b\u044c',
+            pCustom: '\u0414\u0440\u0443\u0433\u043e\u0435...',
+            scenarioLabel: '\u0421\u0446\u0435\u043d\u0430\u0440\u0438\u0439 \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u0438\u0437\u0430\u0446\u0438\u0438',
+            scenarioTunnel: '\u0422\u043e\u043b\u044c\u043a\u043e \u0442\u0443\u043d\u043d\u0435\u043b\u044c (\u0440\u0443\u0447\u043d\u044b\u0435 \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u044b)',
+            scenarioDns: 'DNS-\u043c\u0430\u0440\u0448\u0440\u0443\u0442\u0438\u0437\u0430\u0446\u0438\u044f \u0434\u043b\u044f \u0441\u0435\u0440\u0432\u0438\u0441\u043e\u0432',
+            scenarioNonRu: '\u0412\u0435\u0441\u044c \u043d\u0435-\u0420\u0424 \u0442\u0440\u0430\u0444\u0438\u043a \u0447\u0435\u0440\u0435\u0437 \u0442\u0443\u043d\u043d\u0435\u043b\u044c',
+            servicesLabel: '\u0421\u0435\u0440\u0432\u0438\u0441\u044b \u0434\u043b\u044f \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u0438\u0437\u0430\u0446\u0438\u0438 \u0447\u0435\u0440\u0435\u0437 \u0442\u0443\u043d\u043d\u0435\u043b\u044c',
+            exclusionsLabel: '\u0418\u0441\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0438\u0437 \u0442\u0443\u043d\u043d\u0435\u043b\u044f (\u043e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u043d\u0430\u043f\u0440\u044f\u043c\u0443\u044e)',
+            btnSelectAll: '\u0412\u044b\u0431\u0440\u0430\u0442\u044c \u0432\u0441\u0435',
+            btnDeselectAll: '\u0421\u043d\u044f\u0442\u044c \u0432\u0441\u0435',
+            sAuto: 'Auto (usb1/ \u2192 disk1/)',
+            warnFasttrack: '\u041f\u0440\u0430\u0432\u0438\u043b\u0430 Fasttrack \u0431\u0443\u0434\u0443\u0442 \u043e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u044b \u0434\u043b\u044f \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u043e\u0439 \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u0438\u0437\u0430\u0446\u0438\u0438. \u0421\u043a\u0440\u0438\u043f\u0442 \u0443\u0434\u0430\u043b\u0435\u043d\u0438\u044f \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442 \u0438\u0445.',
+            noServiceSelected: '\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0445\u043e\u0442\u044f \u0431\u044b \u043e\u0434\u0438\u043d \u0441\u0435\u0440\u0432\u0438\u0441.',
+            modeContainerHint: 'WireGuard-\u043a\u043b\u0438\u0435\u043d\u0442 \u043d\u0430 MikroTik + awg-proxy \u0437\u0430\u043f\u0443\u0441\u043a\u0430\u0435\u0442\u0441\u044f \u0432 Docker-\u043a\u043e\u043d\u0442\u0435\u0439\u043d\u0435\u0440\u0435 \u043f\u0440\u044f\u043c\u043e \u043d\u0430 \u0440\u043e\u0443\u0442\u0435\u0440\u0435',
+            modeStandaloneHint: 'WireGuard-\u043a\u043b\u0438\u0435\u043d\u0442 \u043d\u0430 MikroTik + awg-proxy \u0437\u0430\u043f\u0443\u0441\u043a\u0430\u0435\u0442\u0441\u044f \u043d\u0430 \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u043e\u043c \u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u0435 (Raspberry Pi, VPS \u0438\u043b\u0438 \u0434\u0440\u0443\u0433\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440)',
+            scenarioTunnelHint: '\u041c\u0430\u0440\u0448\u0440\u0443\u0442\u044b \u043d\u0430\u0441\u0442\u0440\u0430\u0438\u0432\u0430\u0435\u0442\u0435 \u0441\u0430\u043c\u043e\u0441\u0442\u043e\u044f\u0442\u0435\u043b\u044c\u043d\u043e \u0447\u0435\u0440\u0435\u0437 /ip/route \u0438\u043b\u0438 \u0434\u0440\u0443\u0433\u0438\u043c\u0438 \u0441\u043f\u043e\u0441\u043e\u0431\u0430\u043c\u0438. \u0414\u043b\u044f \u043e\u043f\u044b\u0442\u043d\u044b\u0445 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439.',
+            scenarioDnsHint: '\u041d\u0430\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u0442 \u0442\u0440\u0430\u0444\u0438\u043a \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0445 \u0441\u0435\u0440\u0432\u0438\u0441\u043e\u0432 \u0447\u0435\u0440\u0435\u0437 \u0442\u0443\u043d\u043d\u0435\u043b\u044c \u0441 \u043f\u043e\u043c\u043e\u0449\u044c\u044e DNS-\u043f\u0440\u0430\u0432\u0438\u043b. \u041b\u0443\u0447\u0448\u0435 \u0432\u0441\u0435\u0433\u043e \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u043d\u0430 \u0447\u0438\u0441\u0442\u043e\u0439 (reset) \u043a\u043e\u043d\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u0438.',
+            scenarioNonRuHint: '\u0412\u0435\u0441\u044c \u0442\u0440\u0430\u0444\u0438\u043a \u0438\u0434\u0451\u0442 \u0447\u0435\u0440\u0435\u0437 \u0442\u0443\u043d\u043d\u0435\u043b\u044c, \u043a\u0440\u043e\u043c\u0435 \u0440\u043e\u0441\u0441\u0438\u0439\u0441\u043a\u0438\u0445 IP-\u0434\u0438\u0430\u043f\u0430\u0437\u043e\u043d\u043e\u0432 (\u043e\u0431\u043d\u043e\u0432\u043b\u044f\u044e\u0442\u0441\u044f \u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u043e). \u041b\u0443\u0447\u0448\u0435 \u0432\u0441\u0435\u0433\u043e \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u043d\u0430 \u0447\u0438\u0441\u0442\u043e\u0439 (reset) \u043a\u043e\u043d\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u0438.',
+            prefixHint: '\u041c\u0435\u043d\u044f\u0439\u0442\u0435 \u043f\u0440\u0435\u0444\u0438\u043a\u0441, \u0442\u043e\u043b\u044c\u043a\u043e \u0435\u0441\u043b\u0438 \u043d\u0443\u0436\u043d\u043e 2+ \u0442\u0443\u043d\u043d\u0435\u043b\u044f \u0441 \u0440\u0430\u0437\u043d\u044b\u043c\u0438 \u043f\u0440\u0430\u0432\u0438\u043b\u0430\u043c\u0438 \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u0438\u0437\u0430\u0446\u0438\u0438'
+        }
+    };
+
+    function t(key) { return (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key; }
+
+    function setLang(lang) {
+        currentLang = lang;
+        try { localStorage.setItem('awg-lang', lang); } catch(e) {}
+        applyI18n();
+    }
+
+    function applyI18n() {
+        var els = document.querySelectorAll('[data-i18n]');
+        for (var i = 0; i < els.length; i++) {
+            els[i].textContent = t(els[i].getAttribute('data-i18n'));
+        }
+        var phs = document.querySelectorAll('[data-i18n-ph]');
+        for (var i = 0; i < phs.length; i++) {
+            phs[i].placeholder = t(phs[i].getAttribute('data-i18n-ph'));
+        }
+        document.title = t('title');
+        document.documentElement.lang = currentLang;
+        document.getElementById('lang-toggle').textContent = currentLang === 'ru' ? 'EN' : 'RU';
+    }
 
     // ============================================================
     // .conf parser
@@ -418,7 +742,7 @@
             'v2':   'background:#dbeafe;color:#1e40af'
         };
         var protoBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600;' + badgeColors[proto] + ';margin-left:8px">AWG ' + proto + '</span>';
-        var html = '<div style="margin-bottom:8px;font-size:0.8rem;color:var(--text-muted)">[Interface] section' + protoBadge + '</div>';
+        var html = '<div style="margin-bottom:8px;font-size:0.8rem;color:var(--text-muted)">' + esc(t('ifaceSec')) + protoBadge + '</div>';
         html += '<div class="fields-grid">';
         IFACE_REQUIRED.concat(IFACE_OPTIONAL).forEach(function (k) {
             var v = parsed.interface[k];
@@ -431,7 +755,7 @@
         });
         html += '</div>';
 
-        html += '<div style="margin:14px 0 8px;font-size:0.8rem;color:var(--text-muted)">[Peer] section</div>';
+        html += '<div style="margin:14px 0 8px;font-size:0.8rem;color:var(--text-muted)">' + esc(t('peerSec')) + '</div>';
         html += '<div class="fields-grid">';
         PEER_REQUIRED.concat(PEER_OPTIONAL).forEach(function (k) {
             var v = parsed.peer[k];
@@ -525,6 +849,11 @@
 
     function isPositiveInt(s) {
         return /^[1-9]\d*$/.test(s);
+    }
+
+    function randomizeKeepalive(val) {
+        if (parseInt(val, 10) === 25) return String(Math.floor(Math.random() * 271) + 30);
+        return val;
     }
 
     function isValidCPSTemplate(s) {
@@ -652,9 +981,323 @@
     }
 
     // ============================================================
-    // Generate uninstall script as /system/script/add command
+    // Services & exclusions data
     // ============================================================
-    function buildUninstallScriptSource(hasDNS, storageDisk, prefix, net) {
+    var SERVICES = {
+        telegram:  {list:'Telegram',  fwd:'Google', d:['telegram.org','t.me','telesco.pe','tdesktop.com','telegram.me','telegram.dog','telegra.ph'], r:['telegram'], on:true},
+        youtube:   {list:'YouTube',   fwd:'Google', d:['youtube.com','youtu.be','googlevideo.com','ytimg.com','yt3.ggpht.com','yt.be','youtube-nocookie.com','youtubekids.com','youtube-ui.l.google.com'], r:['youtube','googlevideo'], on:true},
+        instagram: {list:'Instagram', fwd:'Google', d:['ig.me','instagram.com','cdninstagram.com','instagram.net'], r:['instagram'], on:true},
+        discord:   {list:'Discord',   fwd:'Google', d:['discord.com','discord.gg','discordapp.com','discordapp.net','dis.gd','discord.media'], r:['discord'], on:true},
+        openai:    {list:'OpenAI',    fwd:'Comss',  d:['openai.com','chatgpt.com','sora.com','oaiusercontent.com','oaistatic.com'], r:[], on:true},
+        netflix:   {list:'NetFlix',   fwd:'Google', d:['netflix.com','netflix.net','nflximg.com','nflximg.net','nflxvideo.net','nflxso.net','nflxext.com','fast.com'], r:[], on:true},
+        spotify:   {list:'Spotify',   fwd:'Google', d:['spotify.com','spoti.fi','scdn.co','spotifycdn.com','spotifycdn.net','byspotify.com','pscdn.co','spotify-everywhere.com','spotify.design','spotifycharts.com','spotifycodes.com','spotifyforbrands.com','spotifyjobs.com'], r:[], on:true},
+        twitter:   {list:'Twitter',   fwd:'Google', d:['twitter.com','x.com','t.co','twimg.com','twitpic.com','vine.co'], r:[], on:true},
+        tiktok:    {list:'TikTok',    fwd:'Google', d:['tiktok.com','tiktokcdn.com','tiktokv.com','musical.ly','tiktokcdn-us.com','tiktokd.org','byteoversea.com','ibyteimg.com','ibytedtos.com','byteimg.com'], r:[], on:true},
+        meta:      {list:'META',      fwd:'Google', d:['facebook.com','fbcdn.net','fb.com','fb.me','fbsbx.com','whatsapp.com','whatsapp.net','oculus.com','oculuscdn.com','instagram.com','cdninstagram.com'], r:['facebook','instagram','oculus','whatsapp'], on:false},
+        samsung:   {list:'Samsung',   fwd:'Google', d:['samsung.com','samsungcloud.com','samsungapps.com','samsungdm.com','samsungelectronics.com'], r:[], on:false},
+        intel:     {list:'Intel',     fwd:'Comss',  d:['intel.com','intel.co.uk','intel.co.jp','intel.de','intel.fr'], r:['intel'], on:false},
+        lg:        {list:'LG',        fwd:'Google', d:['lg.com','lgappstv.com','lge.com','lgsmartad.com'], r:[], on:false},
+        tmdb:      {list:'TMDB',      fwd:'Comss',  d:['themoviedb.org','tmdb.org','tmdb-image-prod.b-cdn.net'], r:[], on:false},
+        rezka:     {list:'Rezka',     fwd:'Comss',  d:['stream.voidboost.cc','zerocdn.com'], r:['rezka'], on:false},
+        tidal:     {list:'Tidal',     fwd:'Google', d:['tidal.com','tidalhifi.com','wimpmusic.com'], r:[], on:false},
+        steam:     {list:'Steam',     fwd:'Google', d:['steampowered.com','steamcommunity.com','steamstatic.com','steamcdn-a.akamaihd.net','steamgames.com','steamusercontent.com','valve.software','valvesoftware.com'], r:[], on:false}
+    };
+
+    var EXCLUSIONS = {
+        steam:   {list:'Steam',      label:'Steam',       d:['steampowered.com','steamcommunity.com','steamstatic.com','steamcdn-a.akamaihd.net','steamgames.com','steamusercontent.com','valve.software','valvesoftware.com'], r:[], fwd:'Google', on:true},
+        epic:    {list:'EpicGames',   label:'Epic Games',  d:['epicgames.com','unrealengine.com','fortnite.com','epicgames.dev'], r:[], fwd:'Google', on:false},
+        blizzard:{list:'Blizzard',    label:'Battle.net',  d:['blizzard.com','battle.net','blizzard.net'], r:[], fwd:'Google', on:false},
+        apple:   {list:'Apple',       label:'Apple',       d:['apple.com','icloud.com','mzstatic.com','apple-dns.net','cdn-apple.com'], r:[], fwd:'Google', on:false},
+        microsoft:{list:'Microsoft',  label:'Microsoft',   d:['microsoft.com','windowsupdate.com','live.com','office.com','office.net','msftconnecttest.com','azure.com'], r:[], fwd:'Google', on:false}
+    };
+
+    var DOH_FORWARDERS = [
+        {doh:'https://dns.google/dns-query', name:'Google'},
+        {doh:'https://dns.comss.one/mikrotik', name:'Comss'},
+        {doh:'https://cloudflare-dns.com/dns-query', name:'CloudFlare'},
+        {doh:'https://dns.quad9.net/dns-query', name:'Quad9'}
+    ];
+
+    var DNS_STATICS = [
+        {addr:'1.1.1.1', comment:'DNS CloudFlare', name:'cloudflare-dns.com'},
+        {addr:'1.0.0.1', comment:'DNS CloudFlare', name:'cloudflare-dns.com'},
+        {addr:'8.8.8.8', comment:'DNS Google', name:'dns.google'},
+        {addr:'8.8.4.4', comment:'DNS Google', name:'dns.google'},
+        {addr:'9.9.9.9', comment:'DNS Quad9', name:'dns.quad9.net'},
+        {addr:'149.112.112.112', comment:'DNS Quad9', name:'dns.quad9.net'},
+        {addr:'195.133.25.16', comment:'DNS Comss', name:'dns.comss.one'}
+    ];
+
+    // ============================================================
+    // Scenario helpers
+    // ============================================================
+    function getScenario() {
+        var radios = document.getElementsByName('scenario');
+        for (var i = 0; i < radios.length; i++) {
+            if (radios[i].checked) return radios[i].value;
+        }
+        return 'tunnel';
+    }
+
+    function onScenarioChange() {
+        var s = getScenario();
+        document.getElementById('services-panel').style.display = s === 'dns-fwd' ? 'block' : 'none';
+        document.getElementById('exclusions-panel').style.display = s === 'non-ru' ? 'block' : 'none';
+        document.getElementById('fasttrack-warn').style.display = (s === 'dns-fwd' || s === 'non-ru') ? 'block' : 'none';
+        var hintKey = s === 'dns-fwd' ? 'scenarioDnsHint' : s === 'non-ru' ? 'scenarioNonRuHint' : 'scenarioTunnelHint';
+        document.getElementById('scenario-hint').setAttribute('data-i18n', hintKey);
+        document.getElementById('scenario-hint').textContent = t(hintKey);
+    }
+
+    function initServiceCheckboxes() {
+        var grid = document.getElementById('services-grid');
+        var html = '';
+        var keys = Object.keys(SERVICES);
+        for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            var s = SERVICES[k];
+            html += '<label><input type="checkbox" name="svc" value="' + k + '"' + (s.on ? ' checked' : '') + '> ' + esc(s.list) + '</label>';
+        }
+        grid.innerHTML = html;
+    }
+
+    function initExclusionCheckboxes() {
+        var grid = document.getElementById('exclusions-grid');
+        var html = '';
+        var keys = Object.keys(EXCLUSIONS);
+        for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            var ex = EXCLUSIONS[k];
+            html += '<label><input type="checkbox" name="excl" value="' + k + '"' + (ex.on ? ' checked' : '') + '> ' + esc(ex.label) + '</label>';
+        }
+        grid.innerHTML = html;
+    }
+
+    function toggleAllServices(on) {
+        var cbs = document.querySelectorAll('input[name="svc"]');
+        for (var i = 0; i < cbs.length; i++) cbs[i].checked = on;
+    }
+
+    function getSelectedServices() {
+        var cbs = document.querySelectorAll('input[name="svc"]:checked');
+        var keys = [];
+        for (var i = 0; i < cbs.length; i++) keys.push(cbs[i].value);
+        return keys;
+    }
+
+    function getSelectedExclusions() {
+        var cbs = document.querySelectorAll('input[name="excl"]:checked');
+        var keys = [];
+        for (var i = 0; i < cbs.length; i++) keys.push(cbs[i].value);
+        return keys;
+    }
+
+    // ============================================================
+    // Routing scenario builders
+    // ============================================================
+    function buildFwdEntries(prefix, serviceKeys, svcMap) {
+        var lines = [];
+        for (var i = 0; i < serviceKeys.length; i++) {
+            var svc = svcMap[serviceKeys[i]];
+            if (!svc) continue;
+            // Compact: foreach loop over domain array
+            var domains = [];
+            for (var j = 0; j < svc.d.length; j++) domains.push('"' + svc.d[j] + '"');
+            lines.push(':foreach d in={' + domains.join(';') + '} do={');
+            lines.push('  /ip/dns/static/add address-list=' + svc.list + ' forward-to=' + svc.fwd + ' match-subdomain=yes type=FWD name=$d comment=' + prefix + '-dns-fwd');
+            lines.push('}');
+            if (svc.r) {
+                for (var j = 0; j < svc.r.length; j++) {
+                    lines.push('/ip/dns/static/add address-list=' + svc.list + ' forward-to=' + svc.fwd + ' type=FWD regexp=' + svc.r[j] + ' comment=' + prefix + '-dns-fwd');
+                }
+            }
+        }
+        return lines;
+    }
+
+    function buildPolicyRouting(prefix, tableName, commentTag) {
+        return [
+            '/routing/table/add name=' + tableName + ' fib comment=' + commentTag,
+            '/ip/route/add dst-address=0.0.0.0/0 gateway=wg-' + prefix + ' routing-table=' + tableName + ' comment=' + commentTag
+        ];
+    }
+
+    function buildFasttrackRestore(prefix) {
+        return [
+            '  :foreach rule in=[/ip/firewall/filter/find where comment~"disabled-by-' + prefix + '"] do={',
+            '    :local c [/ip/firewall/filter/get $rule comment]',
+            '    :local origComment [:pick $c ([:find $c "|"] + 1) [:len $c]]',
+            '    /ip/firewall/filter/set $rule disabled=no comment=$origComment',
+            '  }'
+        ];
+    }
+
+    function buildDnsRoutingScenario(prefix, selectedServices) {
+        var lines = [];
+        lines.push('');
+        lines.push('# ============================================================');
+        lines.push('# DNS-based routing for selected services');
+        lines.push('# ============================================================');
+        lines.push('{');
+        lines.push('# DoH forwarders');
+        for (var i = 0; i < DOH_FORWARDERS.length; i++) {
+            var f = DOH_FORWARDERS[i];
+            lines.push(':do { /ip/dns/forwarders/add doh-servers=' + f.doh + ' name=' + f.name + ' comment=' + prefix + '-dns-fwd } on-error={}');
+        }
+        lines.push('# DNS static entries for DoH resolver IPs');
+        for (var i = 0; i < DNS_STATICS.length; i++) {
+            var s = DNS_STATICS[i];
+            lines.push('/ip/dns/static/add address=' + s.addr + ' comment="' + prefix + '-dns-fwd" name=' + s.name + ' type=A');
+        }
+        lines.push('# FWD entries');
+        lines = lines.concat(buildFwdEntries(prefix, selectedServices, SERVICES));
+        lines.push('# Mangle rules');
+        // Compact: foreach loop over address-list names
+        var listNames = [];
+        for (var i = 0; i < selectedServices.length; i++) {
+            var svc = SERVICES[selectedServices[i]];
+            if (svc) listNames.push('"' + svc.list + '"');
+        }
+        lines.push(':foreach l in={' + listNames.join(';') + '} do={');
+        lines.push('  /ip/firewall/mangle/add chain=prerouting action=mark-connection new-connection-mark=' + prefix + '-fwd-conn dst-address-list=$l in-interface-list=LAN passthrough=yes comment=' + prefix + '-fwd');
+        lines.push('}');
+        lines.push('/ip/firewall/mangle/add chain=prerouting action=mark-routing new-routing-mark=' + prefix + '-fwd-table connection-mark=' + prefix + '-fwd-conn in-interface-list=LAN passthrough=no comment=' + prefix + '-fwd');
+        lines.push('# Policy routing');
+        lines = lines.concat(buildPolicyRouting(prefix, prefix + '-fwd-table', prefix + '-fwd'));
+        lines.push('# Disable fasttrack for policy routing');
+        lines.push(':foreach rule in=[/ip/firewall/filter/find where action=fasttrack-connection] do={');
+        lines.push('  :local origComment [/ip/firewall/filter/get $rule comment]');
+        lines.push('  /ip/firewall/filter/set $rule disabled=yes comment=("disabled-by-' + prefix + '|" . $origComment)');
+        lines.push('}');
+        lines.push('}');
+        return lines;
+    }
+
+    function buildNonRuScenario(prefix, exclusionKeys) {
+        var lines = [];
+        lines.push('');
+        lines.push('# ============================================================');
+        lines.push('# Route all non-RU traffic through tunnel');
+        lines.push('# ============================================================');
+        lines.push('');
+        lines.push('# RU address-list update script');
+        lines.push('/system/script/add name=' + prefix + '-update-ru policy=read,write,test,ftp comment=' + prefix + '-ru source={');
+        lines.push('  :local url "' + REPO.dl + 'ru_ranges.rsc"');
+        lines.push('  :local fileName "ru_ranges.rsc"');
+        lines.push('  :do { /tool/fetch url=$url dst-path=$fileName mode=https http-header-field="User-Agent: MikroTik" http-max-redirect-count=10');
+        lines.push('  } on-error={ :log error "RU list: fetch failed"; :error "fetch failed" }');
+        lines.push('  :delay 2s');
+        lines.push('  :local fileSize [/file get [find name=$fileName] size]');
+        lines.push('  :if ($fileSize < 400000 || $fileSize > 2000000) do={');
+        lines.push('    :log error ("RU list: bad file size " . $fileSize); /file remove $fileName; :error "bad file size" }');
+        lines.push('  :local oldRu [/ip firewall address-list print count-only where list=RU and comment=RIPE-RU]');
+        lines.push('  :local snap {\"u\"=[/user print count-only];\"f\"=[/ip firewall filter print count-only];\"n\"=[/ip firewall nat print count-only];\"m\"=[/ip firewall mangle print count-only];\"s\"=[/system script print count-only];\"c\"=[/system scheduler print count-only]}');
+        lines.push('  /ip firewall address-list remove [find where list=RU and comment=RIPE-RU]');
+        lines.push('  :do { /import file=$fileName } on-error={ :log error "RU list: import failed"; /file remove $fileName; :error "import failed" }');
+        lines.push('  :local safe true');
+        lines.push('  :local newRu [/ip firewall address-list print count-only where list=RU and comment=RIPE-RU]');
+        lines.push('  :if ($newRu < 1000) do={ :log error ("RU list: too few: " . $newRu); :set safe false }');
+        lines.push('  :if ([/user print count-only] != ($snap->"u")) do={ :log error "RU list: user count changed"; :set safe false }');
+        lines.push('  :if ([/ip firewall filter print count-only] != ($snap->"f")) do={ :log error "RU list: filter changed"; :set safe false }');
+        lines.push('  :if ([/ip firewall nat print count-only] != ($snap->"n")) do={ :log error "RU list: NAT changed"; :set safe false }');
+        lines.push('  :if ([/ip firewall mangle print count-only] != ($snap->"m")) do={ :log error "RU list: mangle changed"; :set safe false }');
+        lines.push('  :if ([/system script print count-only] != ($snap->"s")) do={ :log error "RU list: scripts changed"; :set safe false }');
+        lines.push('  :if ([/system scheduler print count-only] != ($snap->"c")) do={ :log error "RU list: schedulers changed"; :set safe false }');
+        lines.push('  /file remove $fileName');
+        lines.push('  :if (!$safe) do={ :log error "RU list: TAMPERING DETECTED"; :error "tampering" }');
+        lines.push('  :log info ("RU list: " . $oldRu . " -> " . $newRu . " entries")');
+        lines.push('}');
+        lines.push('/system/scheduler/add name=' + prefix + '-update-ru interval=1d start-time=04:05:00 on-event="/system/script/run ' + prefix + '-update-ru" policy=read,write,test,ftp comment=' + prefix + '-ru');
+        lines.push('/system/script/run ' + prefix + '-update-ru');
+
+        // Mangle + routing wrapped in a single block
+        lines.push('{');
+        if (exclusionKeys.length > 0) {
+            lines.push('# DoH forwarders');
+            for (var i = 0; i < DOH_FORWARDERS.length; i++) {
+                var f = DOH_FORWARDERS[i];
+                lines.push(':do { /ip/dns/forwarders/add doh-servers=' + f.doh + ' name=' + f.name + ' comment=' + prefix + '-dns-fwd } on-error={}');
+            }
+            lines.push('# DNS static entries for DoH resolver IPs');
+            for (var i = 0; i < DNS_STATICS.length; i++) {
+                var s = DNS_STATICS[i];
+                lines.push('/ip/dns/static/add address=' + s.addr + ' comment="' + prefix + '-dns-fwd" name=' + s.name + ' type=A');
+            }
+            lines.push('# FWD entries for exclusions');
+            lines = lines.concat(buildFwdEntries(prefix, exclusionKeys, EXCLUSIONS));
+        }
+
+        lines.push('# Mangle: accept private & special networks');
+        lines.push(':foreach net in={"10.0.0.0/8";"172.16.0.0/12";"192.168.0.0/16";"100.64.0.0/10";"169.254.0.0/16";"224.0.0.0/4"} do={');
+        lines.push('  /ip/firewall/mangle/add chain=prerouting action=accept dst-address=$net in-interface-list=LAN comment=' + prefix + '-non-ru');
+        lines.push('}');
+        lines.push('# Accept RU traffic');
+        lines.push('/ip/firewall/mangle/add chain=prerouting action=accept dst-address-list=RU in-interface-list=LAN comment=' + prefix + '-non-ru');
+
+        if (exclusionKeys.length > 0) {
+            var exListNames = [];
+            for (var i = 0; i < exclusionKeys.length; i++) {
+                var ex = EXCLUSIONS[exclusionKeys[i]];
+                if (ex) exListNames.push('"' + ex.list + '"');
+            }
+            lines.push('# Accept excluded services');
+            lines.push(':foreach l in={' + exListNames.join(';') + '} do={');
+            lines.push('  /ip/firewall/mangle/add chain=prerouting action=accept dst-address-list=$l in-interface-list=LAN comment=' + prefix + '-non-ru');
+            lines.push('}');
+        }
+
+        lines.push('# Mark everything else for tunnel');
+        lines.push('/ip/firewall/mangle/add chain=prerouting action=mark-connection new-connection-mark=' + prefix + '-non-ru-conn in-interface-list=LAN passthrough=yes comment=' + prefix + '-non-ru');
+        lines.push('/ip/firewall/mangle/add chain=prerouting action=mark-routing new-routing-mark=' + prefix + '-non-ru-table connection-mark=' + prefix + '-non-ru-conn in-interface-list=LAN passthrough=no comment=' + prefix + '-non-ru');
+        lines.push('# Policy routing');
+        lines = lines.concat(buildPolicyRouting(prefix, prefix + '-non-ru-table', prefix + '-non-ru'));
+        lines.push('# Disable fasttrack for policy routing');
+        lines.push(':foreach rule in=[/ip/firewall/filter/find where action=fasttrack-connection] do={');
+        lines.push('  :local origComment [/ip/firewall/filter/get $rule comment]');
+        lines.push('  /ip/firewall/filter/set $rule disabled=yes comment=("disabled-by-' + prefix + '|" . $origComment)');
+        lines.push('}');
+        lines.push('}');
+
+        return lines;
+    }
+
+    // ============================================================
+    // Auto-storage builder
+    // ============================================================
+    function buildAutoStorage(prefix) {
+        return [
+            '# Auto-detect storage',
+            ':global awgDisk "disk1"',
+            '{',
+            '  :local usbFree 0',
+            '  :do { :set usbFree [/disk/get [find where mount-point="usb1"] free] } on-error={}',
+            '  :if ($usbFree > 0) do={',
+            '    :set awgDisk "usb1"',
+            '    :put ("Using USB: usb1 (" . ($usbFree / 1048576) . " MB free)")',
+            '  } else={',
+            '    :if ([:len [/disk/find where slot="usb1"]] > 0) do={',
+            '      :put "USB found but not mounted. Format as ext4?"',
+            "      :put \"Press 'y' to confirm:\"",
+            '      :local key [/terminal/inkey timeout=30]',
+            '      :if ($key = 121 || $key = 89) do={',
+            '        /disk/format-drive usb1 file-system=ext4 label=usb1',
+            '        :delay 3s',
+            '        :do { :set usbFree [/disk/get [find where mount-point="usb1"] free] } on-error={}',
+            '        :if ($usbFree > 0) do={',
+            '          :set awgDisk "usb1"',
+            '        } else={ :put "Format failed, using disk1" }',
+            '      } else={ :put "Using disk1" }',
+            '    } else={ :put "No USB, using disk1" }',
+            '  }',
+            '}'
+        ];
+    }
+
+    // ============================================================
+    // Generate uninstall script as /system/script/add command (container mode)
+    // ============================================================
+    function buildUninstallScriptSource(hasDNS, storageDisk, prefix, net, scenario) {
+        var isAuto = storageDisk === '__auto';
         var src = [];
         src.push('/system/script/add name=' + prefix + '-uninstall comment=' + prefix + ' source={');
         src.push('  :put "Uninstallimg AmneziaWG..."');
@@ -663,7 +1306,14 @@
             src.push('  :local prevDNS ""');
             src.push('  :do { :set prevDNS [/container/envs/get [find where list="' + prefix + '-env" key="AWG_PREV_DNS"] value] } on-error={}');
         }
-        if (storageDisk !== 'disk1') {
+        if (isAuto) {
+            src.push('  :local storageDisk "disk1"');
+            src.push('  :do { :set storageDisk [/container/envs/get [find where list="' + prefix + '-env" key="AWG_STORAGE"] value] } on-error={}');
+            src.push('  :local prevTmpdir ""');
+            src.push('  :if ($storageDisk != "disk1") do={');
+            src.push('    :do { :set prevTmpdir [/container/envs/get [find where list="' + prefix + '-env" key="AWG_PREV_TMPDIR"] value] } on-error={}');
+            src.push('  }');
+        } else if (storageDisk !== 'disk1') {
             src.push('  :local prevTmpdir ""');
             src.push('  :do { :set prevTmpdir [/container/envs/get [find where list="' + prefix + '-env" key="AWG_PREV_TMPDIR"] value] } on-error={}');
         }
@@ -671,17 +1321,33 @@
         if (hasDNS) {
             src.push('  /ip/route/remove [find where comment=' + prefix + '-dns]');
         }
+        if (scenario !== 'tunnel') {
+            src.push('  :do { /ip/route/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /ip/dns/static/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /ip/dns/forwarders/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /ip/firewall/mangle/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /routing/table/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /ip/firewall/address-list/remove [find where list=RU and comment=RIPE-RU] } on-error={}');
+            src.push('  :do { /system/scheduler/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /system/script/remove [find where comment~"' + prefix + '" and name!="' + prefix + '-uninstall"] } on-error={}');
+            src = src.concat(buildFasttrackRestore(prefix));
+        }
         src.push('  /container/stop [find where interface=veth-' + prefix + ']');
         src.push('  :delay 7s');
         src.push('  /container/remove [find where interface=veth-' + prefix + ']');
         src.push('  /container/envs/remove [find where list="' + prefix + '-env"]');
         if (hasDNS) {
             src.push('  :if ($prevDNS != "") do={');
-            src.push('    /ip/dns/set servers=$prevDNS');
+            src.push('    :do { /ip/dns/set servers="$prevDNS" } on-error={}');
             src.push('    :put ("DNS restored to: $prevDNS")');
             src.push('  }');
         }
-        if (storageDisk !== 'disk1') {
+        if (isAuto) {
+            src.push('  :if ($storageDisk != "disk1") do={');
+            src.push('    /container/config set tmpdir=$prevTmpdir');
+            src.push('    :put ("Container tmpdir restored to: $prevTmpdir")');
+            src.push('  }');
+        } else if (storageDisk !== 'disk1') {
             src.push('  /container/config set tmpdir=$prevTmpdir');
             src.push('  :put ("Container tmpdir restored to: $prevTmpdir")');
         }
@@ -693,9 +1359,16 @@
         src.push('  /ip/address/remove [find where interface="wg-' + prefix + '"]');
         src.push('  /interface/wireguard/remove [find where name="wg-' + prefix + '"]');
         src.push('  :do { /file/remove [find where name~"' + prefix + '.+tar"] } on-error={}');
-        src.push('  :do { /file/remove [find where name="' + storageDisk + '/' + prefix + '"] } on-error={}');
-        if (storageDisk !== 'disk1') {
-            src.push('  :do { /file/remove [find where name~"' + storageDisk + '/pull"] } on-error={}');
+        if (isAuto) {
+            src.push('  :do { /file/remove [find where name=($storageDisk . "/' + prefix + '")] } on-error={}');
+            src.push('  :if ($storageDisk != "disk1") do={');
+            src.push('    :do { /file/remove [find where name~($storageDisk . "/pull")] } on-error={}');
+            src.push('  }');
+        } else {
+            src.push('  :do { /file/remove [find where name="' + storageDisk + '/' + prefix + '"] } on-error={}');
+            if (storageDisk !== 'disk1') {
+                src.push('  :do { /file/remove [find where name~"' + storageDisk + '/pull"] } on-error={}');
+            }
         }
         src.push('  :put "Uninstall AmneziaWG Proxy complete!"');
         src.push('  :log info "Uninstall AmneziaWG Proxy complete!"');
@@ -705,9 +1378,52 @@
     }
 
     // ============================================================
-    // Generate MikroTik commands
+    // Generate standalone uninstall script (no container/veth)
     // ============================================================
-    function buildCommands(parsed, storageDisk, prefix, net) {
+    function buildStandaloneUninstallScriptSource(hasDNS, prefix, scenario) {
+        var src = [];
+        src.push('/system/script/add name=' + prefix + '-uninstall comment=' + prefix + ' source={');
+        src.push('  :put "Uninstalling AmneziaWG Standalone..."');
+        src.push('  :log info "Uninstalling AmneziaWG Standalone..."');
+        if (hasDNS) {
+            src.push('  :local prevDNS ""');
+            src.push('  :do { :set prevDNS [/system/script/get [find where name=' + prefix + '-prev-dns] comment] } on-error={}');
+            src.push('  :if ([:len $prevDNS] > 0) do={');
+            src.push('    :do { /ip/dns/set servers="$prevDNS" } on-error={}');
+            src.push('    :put ("DNS restored to: $prevDNS")');
+            src.push('  } else={ :put "No previous DNS to restore." }');
+            src.push('  :do { /system/script/remove [find where name=' + prefix + '-prev-dns] } on-error={}');
+        }
+        src.push('  /ip/route/remove [find where comment=' + prefix + '-tunnel]');
+        if (hasDNS) {
+            src.push('  /ip/route/remove [find where comment=' + prefix + '-dns]');
+        }
+        if (scenario !== 'tunnel') {
+            src.push('  :do { /ip/route/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /ip/dns/static/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /ip/dns/forwarders/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /ip/firewall/mangle/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /routing/table/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /ip/firewall/address-list/remove [find where list=RU and comment=RIPE-RU] } on-error={}');
+            src.push('  :do { /system/scheduler/remove [find where comment~"' + prefix + '"] } on-error={}');
+            src.push('  :do { /system/script/remove [find where comment~"' + prefix + '" and name!="' + prefix + '-uninstall"] } on-error={}');
+            src = src.concat(buildFasttrackRestore(prefix));
+        }
+        src.push('  /ip/firewall/nat/remove [find where out-interface="wg-' + prefix + '"]');
+        src.push('  /interface/wireguard/peers/remove [find where interface="wg-' + prefix + '"]');
+        src.push('  /ip/address/remove [find where interface="wg-' + prefix + '"]');
+        src.push('  /interface/wireguard/remove [find where name="wg-' + prefix + '"]');
+        src.push('  :put "Uninstall AmneziaWG Proxy Standalone complete!"');
+        src.push('  :log info "Uninstall AmneziaWG Proxy Standalone complete!"');
+        src.push('  /system/script/remove [find where name=' + prefix + '-uninstall]');
+        src.push('}');
+        return src.join('\n');
+    }
+
+    // ============================================================
+    // Generate MikroTik commands (container mode)
+    // ============================================================
+    function buildCommands(parsed, storageDisk, prefix, net, scenario) {
         var i = parsed.interface;
         var p = parsed.peer;
         var dnsServers = parseDNSServers(i.DNS);
@@ -719,7 +1435,7 @@
         if (p.PresharedKey) peerAdd += ' preshared-key="' + p.PresharedKey + '"';
         peerAdd += ' endpoint-address=' + vethIP + ' endpoint-port=51820' +
             ' allowed-address=' + p.AllowedIPs.replace(/\s*,\s*/g, ',');
-        if (p.PersistentKeepalive) peerAdd += ' persistent-keepalive=' + p.PersistentKeepalive;
+        if (p.PersistentKeepalive) peerAdd += ' persistent-keepalive=' + randomizeKeepalive(p.PersistentKeepalive);
 
         var detectedProto = detectProtocol(i);
         var lines = [
@@ -736,7 +1452,10 @@
             '',
         ];
 
-        if (storageDisk !== 'disk1') {
+        if (storageDisk === '__auto') {
+            lines = lines.concat(buildAutoStorage(prefix));
+            lines.push('');
+        } else if (storageDisk !== 'disk1') {
             lines = lines.concat([
                 '# Check storage device',
                 '{',
@@ -781,7 +1500,7 @@
 
         lines.push('# 1. Uninstall script');
 
-        lines.push(buildUninstallScriptSource(hasDNS, storageDisk, prefix, net));
+        lines.push(buildUninstallScriptSource(hasDNS, storageDisk, prefix, net, scenario));
 
         lines = lines.concat([
             '',
@@ -822,8 +1541,7 @@
             var dnsStr = dnsServers.join(',');
             lines.push('');
             lines.push('# 5. DNS');
-            lines.push(':local prevDNS [/ip/dns/get servers]');
-            lines.push('/container/envs/add list=' + prefix + '-env key=AWG_PREV_DNS value=$prevDNS');
+            lines.push('{ :local rawDNS [/ip/dns/get servers]; :local prevDNS ""; :foreach s in=[:toarray $rawDNS] do={ :if ([:len $prevDNS] > 0) do={ :set prevDNS "$prevDNS,$s" } else={ :set prevDNS $s } }; /container/envs/add list=' + prefix + '-env key=AWG_PREV_DNS value="$prevDNS" }');
             lines.push('# NOTE: replaces existing DNS configuration');
             lines.push('/ip/dns/set servers=' + dnsStr);
             for (var d = 0; d < dnsServers.length; d++) {
@@ -835,7 +1553,16 @@
             '',
             '# ' + (hasDNS ? '6' : '5') + '. Download, create and start container',
         ]);
-        if (storageDisk !== 'disk1') {
+        var isAuto = storageDisk === '__auto';
+        var isExternal = storageDisk !== 'disk1' && !isAuto;
+        if (isAuto) {
+            lines.push('/container/envs/add list=' + prefix + '-env key=AWG_STORAGE value=$awgDisk');
+            lines.push(':if ($awgDisk != "disk1") do={');
+            lines.push('  :local tmpPath ($awgDisk . "/pull")');
+            lines.push('  /container/envs/add list=' + prefix + '-env key=AWG_PREV_TMPDIR value=[/container/config/get tmpdir]');
+            lines.push('  /container/config set tmpdir=$tmpPath ram-high=200M');
+            lines.push('}');
+        } else if (isExternal) {
             lines.push(':local prevTmpdir [/container/config/get tmpdir]');
             lines.push('/container/envs/add list=' + prefix + '-env key=AWG_PREV_TMPDIR value=$prevTmpdir');
             lines.push('/container/config set tmpdir=' + storageDisk + '/pull ram-high=200M');
@@ -856,17 +1583,31 @@
             '  :if ($arch = "arm") do={ :set file ("awg-proxy-arm" . $suffix . ".tar.gz") }',
             '  :if ($arch ~ "x86") do={ :set file ("awg-proxy-amd64" . $suffix . ".tar.gz") }',
             '  :if ($file = "") do={ :error "Unsupported architecture: $arch" }',
-            '  :local url "https://github.com/timbrs/amneziawg-mikrotik/releases/latest/download/$file"',
-            '  :local filePath ' + (storageDisk !== 'disk1' ? '("' + storageDisk + '/pull/" . $file)' : '$file'),
+            '  :local url "' + REPO.dl + '$file"',
         ]);
-        if (storageDisk !== 'disk1') {
+        if (isAuto) {
+            lines.push('  :local filePath $file');
+            lines.push('  :if ($awgDisk != "disk1") do={');
+            lines.push('    :set filePath ($awgDisk . "/pull/" . $file)');
+            lines.push('    :do { /file/make-directory ($awgDisk . "/pull") } on-error={}');
+            lines.push('  }');
+        } else if (isExternal) {
+            lines.push('  :local filePath ("' + storageDisk + '/pull/" . $file)');
             lines.push('  :do { /file/make-directory ' + storageDisk + '/pull } on-error={}');
+        } else {
+            lines.push('  :local filePath $file');
         }
         lines = lines.concat([
             '  :if ([:len [/file/find where name=$filePath]] = 0) do={',
             '    :local freeStorage 0',
         ]);
-        if (storageDisk === 'disk1') {
+        if (isAuto) {
+            lines.push('    :if ($awgDisk = "disk1") do={');
+            lines.push('      :set freeStorage [/system/resource/get free-hdd-space]');
+            lines.push('    } else={');
+            lines.push('      :do { :set freeStorage [/disk/get [find where mount-point=$awgDisk] free] } on-error={}');
+            lines.push('    }');
+        } else if (storageDisk === 'disk1') {
             lines.push('    :set freeStorage [/system/resource/get free-hdd-space]');
         } else {
             lines.push('    :do { :set freeStorage [/disk/get [find where mount-point="' + storageDisk + '"] free] } on-error={}');
@@ -874,7 +1615,7 @@
         lines = lines.concat([
             '    :if ($freeStorage < 5242880) do={',
             '      :put ("WARNING: Low disk space (" . ($freeStorage / 1048576) . "MB free). Need at least 5MB.")',
-            '      :put "See: https://github.com/timbrs/amneziawg-mikrotik#insufficient-disk-space"',
+            '      :put "See: ' + REPO.base + '#insufficient-disk-space"',
             '      :error "Insufficient disk space"',
             '    }',
             '    :put ("Fetching: $url -> " . $filePath)',
@@ -882,7 +1623,14 @@
             '  } else={',
             '    :put ("File already exists: " . $filePath)',
             '  }',
-            '  /container/add file=$filePath interface=veth-' + prefix + ' envlist=' + prefix + '-env hostname=' + prefix + ' root-dir=' + storageDisk + '/' + prefix + ' logging=yes start-on-boot=yes comment=' + prefix,
+        ]);
+        if (isAuto) {
+            lines.push('  :local rootDir ($awgDisk . "/' + prefix + '")');
+            lines.push('  /container/add file=$filePath interface=veth-' + prefix + ' envlist=' + prefix + '-env hostname=' + prefix + ' root-dir=$rootDir logging=no start-on-boot=yes comment=' + prefix);
+        } else {
+            lines.push('  /container/add file=$filePath interface=veth-' + prefix + ' envlist=' + prefix + '-env hostname=' + prefix + ' root-dir=' + storageDisk + '/' + prefix + ' logging=no start-on-boot=yes comment=' + prefix);
+        }
+        lines = lines.concat([
             '  :if ($minor > 20) do={ [:parse "/container/set [find where interface=veth-' + prefix + '] shm-size=4M"] }',
             '  /file/remove $filePath',
             '  :local freeMem [/system/resource/get free-memory]',
@@ -954,6 +1702,134 @@
     }
 
     // ============================================================
+    // Generate MikroTik commands (standalone mode)
+    // ============================================================
+    function buildStandaloneCommands(parsed, proxyIP, prefix, net, scenario) {
+        var i = parsed.interface;
+        var p = parsed.peer;
+        var dnsServers = parseDNSServers(i.DNS);
+        var hasDNS = dnsServers.length > 0;
+        var detectedProto = detectProtocol(i);
+
+        var peerAdd = '/interface/wireguard/peers/add interface=wg-' + prefix +
+            ' public-key="' + p.PublicKey + '"';
+        if (p.PresharedKey) peerAdd += ' preshared-key="' + p.PresharedKey + '"';
+        peerAdd += ' endpoint-address=' + proxyIP + ' endpoint-port=51820' +
+            ' allowed-address=' + p.AllowedIPs.replace(/\s*,\s*/g, ',');
+        if (p.PersistentKeepalive) peerAdd += ' persistent-keepalive=' + randomizeKeepalive(p.PersistentKeepalive);
+
+        var lines = [
+            '# ============================================================',
+            '# AWG Proxy -- MikroTik RouterOS Standalone (protocol: ' + detectedProto + ')',
+            '# Proxy device: ' + proxyIP,
+            '# ' + new Date().toISOString().slice(0, 19).replace('T', ' '),
+            '# ============================================================',
+            '',
+            '# 1. Uninstall script',
+        ];
+
+        lines.push(buildStandaloneUninstallScriptSource(hasDNS, prefix, scenario));
+
+        lines = lines.concat([
+            '',
+            '# 2. WireGuard interface',
+            '/interface/wireguard/add name=wg-' + prefix + ' private-key="' + i.PrivateKey + '" listen-port=' + net.wgPort,
+            peerAdd,
+            '/ip/address/add address=' + i.Address + ' interface=wg-' + prefix,
+            '/ip/firewall/nat/add chain=srcnat action=masquerade out-interface=wg-' + prefix,
+            '',
+        ]);
+
+        var stepN = 3;
+        if (hasDNS) {
+            var dnsStr = dnsServers.join(',');
+            lines.push('# ' + stepN + '. DNS');
+            lines.push('{ :local rawDNS [/ip/dns/get servers]; :local prevDNS ""; :foreach s in=[:toarray $rawDNS] do={ :if ([:len $prevDNS] > 0) do={ :set prevDNS "$prevDNS,$s" } else={ :set prevDNS $s } }; /system/script/add name=' + prefix + '-prev-dns comment="$prevDNS" source="" }');
+            lines.push('/ip/dns/set servers=' + dnsStr);
+            for (var d = 0; d < dnsServers.length; d++) {
+                lines.push('/ip/route/add dst-address=' + dnsServers[d] + '/32 gateway=wg-' + prefix + ' distance=1 comment=' + prefix + '-dns');
+            }
+            lines.push('');
+            stepN++;
+        }
+
+        lines.push('# ' + stepN + '. Enable WireGuard');
+        lines.push('/interface/wireguard/enable wg-' + prefix);
+        lines.push('');
+        stepN++;
+
+        lines.push('# ' + stepN + '. Proxy device setup instructions');
+        lines.push('{');
+        lines.push('  :put "======= AWG PROXY SETUP ======="');
+        lines.push('  :put ""');
+        lines.push('  :put "Run awg-proxy on your external device (' + proxyIP + ')."');
+        lines.push('  :put ""');
+        lines.push('  :put "1. Download the binary for your platform:"');
+        lines.push('  :put "   Linux arm64: ' + REPO.dl + 'awg-proxy-linux-arm64"');
+        lines.push('  :put "   Linux arm:   ' + REPO.dl + 'awg-proxy-linux-arm"');
+        lines.push('  :put "   Linux amd64: ' + REPO.dl + 'awg-proxy-linux-amd64"');
+        lines.push('  :put ""');
+        lines.push('  :put "2. Set environment variables and run:"');
+        lines.push('  :put "export AWG_LISTEN=\\":51820\\""');
+        lines.push('  :put "export AWG_REMOTE=\\"' + p.Endpoint + '\\""');
+        lines.push('  :put "export AWG_JC=\\"' + i.Jc + '\\""');
+        lines.push('  :put "export AWG_JMIN=\\"' + i.Jmin + '\\""');
+        lines.push('  :put "export AWG_JMAX=\\"' + i.Jmax + '\\""');
+        lines.push('  :put "export AWG_S1=\\"' + i.S1 + '\\""');
+        lines.push('  :put "export AWG_S2=\\"' + i.S2 + '\\""');
+        lines.push('  :put "export AWG_H1=\\"' + i.H1 + '\\""');
+        lines.push('  :put "export AWG_H2=\\"' + i.H2 + '\\""');
+        lines.push('  :put "export AWG_H3=\\"' + i.H3 + '\\""');
+        lines.push('  :put "export AWG_H4=\\"' + i.H4 + '\\""');
+        lines.push('  :put "export AWG_SERVER_PUB=\\"' + p.PublicKey + '\\""');
+
+        lines.push('  :put ("export AWG_CLIENT_PUB=\\"" . [/interface/wireguard/get [find name=wg-' + prefix + '] public-key] . "\\"")');
+
+        if (i.S3) lines.push('  :put "export AWG_S3=\\"' + i.S3 + '\\""');
+        if (i.S4) lines.push('  :put "export AWG_S4=\\"' + i.S4 + '\\""');
+        ['I1','I2','I3','I4','I5'].forEach(function(k) {
+            if (i[k]) lines.push('  :put "export AWG_' + k + '=\\"' + i[k] + '\\""');
+        });
+
+        lines.push('  :put ""');
+        lines.push('  :put "chmod +x awg-proxy-linux-* && ./awg-proxy-linux-<arch>"');
+        lines.push('  :put ""');
+        lines.push('  :put "3. (Optional) Create a systemd service for auto-start."');
+
+        if (detectedProto !== 'v2') {
+            lines.push('  :put ""');
+            lines.push('  :put "[WARNING]: Your config uses AWG ' + detectedProto + '. For better obfuscation,"');
+            lines.push('  :put "update AmneziaVPN (v2) to the latest version and regenerate the config."');
+            lines.push('  :put "https://github.com/amnezia-vpn/amnezia-client/releases"');
+        }
+
+        lines = lines.concat([
+            '  :put ""',
+            '  :put "Route specific traffic through the AmneziaWG tunnel:"',
+            '  :put ""',
+            '  :put "  Route a single host:"',
+            '  :put "    /ip/route/add dst-address=8.8.8.8/32 gateway=wg-' + prefix + ' comment=' + prefix + '-tunnel"',
+            '  :put ""',
+            '  :put "  Route a subnet:"',
+            '  :put "    /ip/route/add dst-address=100.0.0.0/8 gateway=wg-' + prefix + ' comment=' + prefix + '-tunnel"',
+            '  :put ""',
+            '  :put "  Remove a route:"',
+            '  :put "    /ip/route/remove [find where comment=' + prefix + '-tunnel dst-address=8.8.8.8/32]"',
+            '  :put ""',
+            '  :put "  Show all tunnel routes:"',
+            '  :put "    /ip/route/print where comment=' + prefix + '-tunnel"',
+            '  :put ""',
+            '  :put "  Uninstall:"',
+            '  :put "    /system/script/run ' + prefix + '-uninstall"',
+            '  :put "================================"',
+            '}',
+            '',
+        ]);
+
+        return lines.join('\n');
+    }
+
+    // ============================================================
     // Syntax highlight
     // ============================================================
     function highlight(text) {
@@ -964,6 +1840,26 @@
 
     function esc(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ============================================================
+    // Mode selector
+    // ============================================================
+    function getDeployMode() {
+        var radios = document.getElementsByName('deploy-mode');
+        for (var i = 0; i < radios.length; i++) {
+            if (radios[i].checked) return radios[i].value;
+        }
+        return 'container';
+    }
+
+    function onModeChange() {
+        var mode = getDeployMode();
+        document.getElementById('storage-row').style.display = mode === 'container' ? 'block' : 'none';
+        document.getElementById('proxy-ip-row').style.display = mode === 'standalone' ? 'block' : 'none';
+        document.getElementById('mode-hint').setAttribute('data-i18n',
+            mode === 'container' ? 'modeContainerHint' : 'modeStandaloneHint');
+        document.getElementById('mode-hint').textContent = t(mode === 'container' ? 'modeContainerHint' : 'modeStandaloneHint');
     }
 
     // ============================================================
@@ -1036,10 +1932,11 @@
         document.getElementById('errors-container').innerHTML = '';
         document.getElementById('parsed-section').style.display = 'none';
         document.getElementById('output-section').style.display = 'none';
+        document.getElementById('routing-section').style.display = 'none';
         document.getElementById('uninstall-section').style.display = 'none';
 
         if (!text.trim()) {
-            showError('Configuration field is empty. Paste the contents of your .conf file.');
+            showError(t('errEmpty'));
             return;
         }
 
@@ -1053,7 +1950,7 @@
         }
 
         if (errors.length > 0) {
-            var html = '<div class="alert alert-error"><strong>Errors:</strong><ul style="margin-top:6px;padding-left:18px">';
+            var html = '<div class="alert alert-error"><strong>' + esc(t('errTitle')) + '</strong><ul style="margin-top:6px;padding-left:18px">';
             errors.forEach(function (e) {
                 html += '<li>' + esc(e) + '</li>';
             });
@@ -1064,15 +1961,58 @@
 
         var prefix = getPrefixName();
         if (!(/^[a-zA-Z0-9]$/.test(prefix) || /^[a-zA-Z0-9][a-zA-Z0-9-]{0,28}[a-zA-Z0-9]$/.test(prefix))) {
-            showError('Invalid tunnel prefix: only letters, digits, and hyphens allowed (1-30 chars, cannot start/end with hyphen).');
+            showError(t('errPrefix'));
             return;
         }
+
+        var scenario = getScenario();
+        var selectedServices = [];
+        var exclusions = [];
+        if (scenario === 'dns-fwd') {
+            selectedServices = getSelectedServices();
+            if (selectedServices.length === 0) {
+                showError(t('noServiceSelected'));
+                return;
+            }
+        } else if (scenario === 'non-ru') {
+            exclusions = getSelectedExclusions();
+        }
+
+        var mode = getDeployMode();
         var tunnelN = getTunnelNumber(prefix);
         var net = getTunnelNetwork(tunnelN);
-        var commands = buildCommands(parsed, getStorageDisk(), prefix, net);
+        var commands;
+
+        if (mode === 'standalone') {
+            var proxyIP = document.getElementById('proxy-ip').value.trim();
+            if (!isValidIP(proxyIP)) {
+                showError(t('errProxyIp'));
+                return;
+            }
+            commands = buildStandaloneCommands(parsed, proxyIP, prefix, net, scenario);
+        } else {
+            commands = buildCommands(parsed, getStorageDisk(), prefix, net, scenario);
+        }
+
         document.getElementById('output').dataset.plain = commands;
         document.getElementById('output').innerHTML = highlight(commands);
         document.getElementById('output-section').style.display = 'block';
+
+        // Routing section (separate for dns-fwd/non-ru to avoid terminal buffer overflow)
+        var routingSection = document.getElementById('routing-section');
+        if (scenario === 'dns-fwd' || scenario === 'non-ru') {
+            var routingCommands = '';
+            if (scenario === 'dns-fwd') {
+                routingCommands = buildDnsRoutingScenario(prefix, selectedServices).join('\n') + '\n';
+            } else {
+                routingCommands = buildNonRuScenario(prefix, exclusions).join('\n') + '\n';
+            }
+            document.getElementById('routing-output').dataset.plain = routingCommands;
+            document.getElementById('routing-output').innerHTML = highlight(routingCommands);
+            routingSection.style.display = 'block';
+        } else {
+            routingSection.style.display = 'none';
+        }
 
         var uninstall = [
             '# To uninstall ' + prefix + ', run:',
@@ -1081,6 +2021,20 @@
         document.getElementById('uninstall-output').dataset.plain = uninstall;
         document.getElementById('uninstall-output').innerHTML = highlight(uninstall);
         document.getElementById('uninstall-section').style.display = 'block';
+
+        try {
+            localStorage.setItem('awg-settings', JSON.stringify({
+                mode: mode,
+                storage: document.getElementById('storage-select').value,
+                storageCustom: document.getElementById('storage-custom').value,
+                prefix: document.getElementById('prefix-select').value,
+                prefixCustom: document.getElementById('prefix-custom').value,
+                proxyIP: document.getElementById('proxy-ip').value,
+                scenario: scenario,
+                selectedServices: selectedServices,
+                exclusions: exclusions
+            }));
+        } catch(e) {}
 
         setTimeout(function () {
             document.getElementById('output-section').scrollIntoView({behavior: 'smooth', block: 'start'});
@@ -1097,13 +2051,23 @@
         document.getElementById('errors-container').innerHTML = '';
         document.getElementById('parsed-section').style.display = 'none';
         document.getElementById('output-section').style.display = 'none';
+        document.getElementById('routing-section').style.display = 'none';
         document.getElementById('uninstall-section').style.display = 'none';
-        document.getElementById('storage-select').value = 'disk1';
+        document.getElementById('storage-select').value = '__auto';
         document.getElementById('storage-custom').style.display = 'none';
         document.getElementById('storage-custom').value = '';
         document.getElementById('prefix-select').value = 'awg-proxy';
         document.getElementById('prefix-custom').style.display = 'none';
         document.getElementById('prefix-custom').value = '';
+        document.getElementById('proxy-ip').value = '';
+        var radios = document.getElementsByName('deploy-mode');
+        radios[0].checked = true;
+        onModeChange();
+        var scenarioRadios = document.getElementsByName('scenario');
+        scenarioRadios[0].checked = true;
+        onScenarioChange();
+        initServiceCheckboxes();
+        initExclusionCheckboxes();
         document.getElementById('conf-input').focus();
     }
 
@@ -1140,7 +2104,7 @@
 
     function flash(btn) {
         var orig = btn.textContent;
-        btn.textContent = 'Copied!';
+        btn.textContent = t('copied');
         btn.classList.remove('btn-secondary');
         btn.classList.add('btn-success');
         setTimeout(function () {
@@ -1153,6 +2117,59 @@
     document.getElementById('conf-input').addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generate();
     });
+
+    // Restore saved settings
+    (function() {
+        try {
+            var s = JSON.parse(localStorage.getItem('awg-settings'));
+            if (!s) return;
+            if (s.mode === 'standalone') {
+                document.querySelector('input[name="deploy-mode"][value="standalone"]').checked = true;
+                onModeChange();
+            }
+            if (s.storage) {
+                document.getElementById('storage-select').value = s.storage;
+                if (s.storage === '__custom' && s.storageCustom) {
+                    document.getElementById('storage-custom').style.display = 'block';
+                    document.getElementById('storage-custom').value = s.storageCustom;
+                }
+            }
+            if (s.prefix) {
+                document.getElementById('prefix-select').value = s.prefix;
+                if (s.prefix === '__custom' && s.prefixCustom) {
+                    document.getElementById('prefix-custom').style.display = 'block';
+                    document.getElementById('prefix-custom').value = s.prefixCustom;
+                }
+            }
+            if (s.proxyIP) document.getElementById('proxy-ip').value = s.proxyIP;
+            if (s.scenario) {
+                var scenarioRadio = document.querySelector('input[name="scenario"][value="' + s.scenario + '"]');
+                if (scenarioRadio) {
+                    scenarioRadio.checked = true;
+                    onScenarioChange();
+                }
+            }
+            if (s.selectedServices && s.selectedServices.length > 0) {
+                var cbs = document.querySelectorAll('input[name="svc"]');
+                for (var i = 0; i < cbs.length; i++) {
+                    cbs[i].checked = s.selectedServices.indexOf(cbs[i].value) >= 0;
+                }
+            }
+            if (s.exclusions && s.exclusions.length > 0) {
+                var cbs = document.querySelectorAll('input[name="excl"]');
+                for (var i = 0; i < cbs.length; i++) {
+                    cbs[i].checked = s.exclusions.indexOf(cbs[i].value) >= 0;
+                }
+            }
+        } catch(e) {}
+    })();
+
+    // Initialize checkboxes
+    initServiceCheckboxes();
+    initExclusionCheckboxes();
+
+    // Apply i18n on load
+    applyI18n();
 </script>
 </body>
 </html>
