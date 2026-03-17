@@ -379,6 +379,31 @@
             margin-top: 4px;
         }
 
+        .dns-info-icon {
+            display: inline-block;
+            cursor: help;
+            font-size: 1rem;
+            color: var(--accent);
+            position: relative;
+        }
+
+        .dns-info-icon:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            white-space: pre-line;
+            width: 320px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
         @media (max-width: 600px) {
             header h1 {
                 font-size: 1.4rem;
@@ -391,6 +416,12 @@
             pre#output {
                 font-size: 0.72rem;
                 padding: 14px;
+            }
+
+            .dns-info-icon:hover::after {
+                width: 240px;
+                left: 0;
+                transform: none;
             }
         }
     </style>
@@ -425,20 +456,34 @@
         <div id="scenario-row" style="margin-top:14px">
             <label data-i18n="scenarioLabel">Routing scenario</label>
             <div class="radio-group">
-                <label><input type="radio" name="scenario" value="tunnel" checked onchange="onScenarioChange()"> <span data-i18n="scenarioTunnel">Tunnel only (manual routes)</span></label>
-                <label><input type="radio" name="scenario" value="dns-fwd" onchange="onScenarioChange()"> <span data-i18n="scenarioDns">DNS-based routing for services</span></label>
+                <label><input type="radio" name="scenario" value="dns-fwd" checked onchange="onScenarioChange()"> <span data-i18n="scenarioDns">DNS-based routing for services</span></label>
+                <label><input type="radio" name="scenario" value="tunnel" onchange="onScenarioChange()"> <span data-i18n="scenarioTunnel">Tunnel only (manual routes)</span></label>
                 <label><input type="radio" name="scenario" value="non-ru" onchange="onScenarioChange()"> <span data-i18n="scenarioNonRu">All non-RU traffic through tunnel</span></label>
             </div>
-            <div id="scenario-hint" class="hint" data-i18n="scenarioTunnelHint">You configure routes manually via /ip/route or other methods. For advanced users.</div>
+            <div id="scenario-hint" class="hint" data-i18n="scenarioDnsHint">Routes traffic to selected services through the tunnel using DNS forwarding (DoH). <span class="dns-info-icon" title="" data-i18n-title="dnsBrowserHint">&#9432;</span></div>
         </div>
-        <div id="fasttrack-warn" class="alert alert-warning" style="display:none;margin-top:8px" data-i18n="warnFasttrack">Fasttrack rules will be disabled for routing to work correctly. Uninstall script restores them.</div>
-        <div id="services-panel" style="display:none" class="scenario-panel">
+        <div id="fasttrack-warn" class="alert alert-warning" style="margin-top:8px" data-i18n="warnFasttrack">Fasttrack rules will be disabled for routing to work correctly. Uninstall script restores them.</div>
+        <div id="non-ru-warn" class="alert alert-error" style="display:none;margin-top:8px" data-i18n="scenarioNonRuWarn"></div>
+        <div id="services-panel" class="scenario-panel">
             <div class="scenario-panel-header">
                 <label style="margin-bottom:0" data-i18n="servicesLabel">Services to route through tunnel</label>
                 <div>
                     <button class="btn btn-secondary btn-sm" onclick="toggleAllServices(true)" data-i18n="btnSelectAll">Select all</button>
                     <button class="btn btn-secondary btn-sm" onclick="toggleAllServices(false)" data-i18n="btnDeselectAll">Deselect all</button>
                 </div>
+            </div>
+            <div style="margin-bottom:10px">
+                <label data-i18n="dohForwarderLabel">DNS-forwarder (DoH)</label>
+                <div class="radio-group" id="doh-selector">
+                    <label><input type="radio" name="doh-fwd" value="GoogleDNS" checked> Google</label>
+                    <label><input type="radio" name="doh-fwd" value="CloudFlare"> CloudFlare</label>
+                    <label><input type="radio" name="doh-fwd" value="Comss"> Comss</label>
+                    <label><input type="radio" name="doh-fwd" value="Quad9"> Quad9</label>
+                    <label><input type="radio" name="doh-fwd" value="Yandex"> Yandex</label>
+                    <label><input type="radio" name="doh-fwd" value="__custom"> <span data-i18n="dohCustom">Custom...</span></label>
+                </div>
+                <input type="text" id="doh-custom-url" placeholder="https://your-dns/dns-query or IP" style="display:none;margin-top:6px;width:100%">
+                <div class="hint" data-i18n="dohHint">All services will use this DNS-over-HTTPS (DoH) provider for domain resolution.</div>
             </div>
             <div id="services-grid" class="checkbox-grid"></div>
         </div>
@@ -529,7 +574,7 @@
     // ============================================================
     var currentLang = (function() {
         try { var s = localStorage.getItem('awg-lang'); if (s === 'ru' || s === 'en') return s; } catch(e) {}
-        return (navigator.language && navigator.language.slice(0,2) === 'ru') ? 'ru' : 'en';
+        return (navigator.language && navigator.language.slice(0,2) === 'en') ? 'en' : 'ru';
     })();
 
     var REPO = (function() {
@@ -542,10 +587,8 @@
                 : base + '/releases/latest/download/';
             return { base: base, dl: dl };
         }
-        return {
-            base: 'https://github.com/timbrs/amneziawg-mikrotik',
-            dl: 'https://github.com/timbrs/amneziawg-mikrotik/releases/latest/download/'
-        };
+        var base = location.origin + location.pathname.replace(/\/[^\/]*$/, '').replace(/\/docs$/, '');
+        return { base: base, dl: base + '/releases/latest/download/' };
     })();
 
     var I18N = {
@@ -609,7 +652,12 @@
             scenarioTunnelHint: 'You configure routes manually via /ip/route or other methods. For advanced users.',
             scenarioDnsHint: 'Routes traffic to selected services through the tunnel using DNS forwarding rules. Works best on a clean (reset) configuration.',
             scenarioNonRuHint: 'All traffic goes through the tunnel except Russian IP ranges (auto-updated daily). Works best on a clean (reset) configuration.',
-            prefixHint: 'Change the prefix only if you need 2+ tunnels with different routing rules'
+            prefixHint: 'Change the prefix only if you need 2+ tunnels with different routing rules',
+            scenarioNonRuWarn: 'WARNING: All foreign traffic will go through VPN. Make sure your server can handle the load. Most VPS have limited bandwidth. A typical household with video services easily consumes 10+ TB/month. ALL torrent traffic will also go through the tunnel (that is A LOT of data). Game traffic may also be routed through it. Choose this option only if you are 100% sure.',
+            dohForwarderLabel: 'DNS forwarder (DoH)',
+            dohCustom: 'Custom...',
+            dohHint: 'All services will use this DNS-over-HTTPS (DoH) provider for domain resolution.',
+            dnsBrowserHint: 'Disable Secure DNS (DoH) in your browser.\nChrome: Settings \u2192 Privacy \u2192 Security \u2192 Use secure DNS \u2192 Off\nFirefox: Settings \u2192 Privacy \u2192 DNS over HTTPS \u2192 Off\nEdge: Settings \u2192 Privacy \u2192 Security \u2192 Use secure DNS \u2192 Off\nOtherwise MikroTik will not see your DNS queries and cannot route traffic.'
         },
         ru: {
             title: 'AWG Proxy \u2014 \u041e\u0444\u043b\u0430\u0439\u043d-\u0433\u0435\u043d\u0435\u0440\u0430\u0442\u043e\u0440 \u043a\u043e\u043c\u0430\u043d\u0434 MikroTik',
@@ -669,9 +717,14 @@
             modeContainerHint: 'WireGuard-\u043a\u043b\u0438\u0435\u043d\u0442 \u043d\u0430 MikroTik + awg-proxy \u0437\u0430\u043f\u0443\u0441\u043a\u0430\u0435\u0442\u0441\u044f \u0432 Docker-\u043a\u043e\u043d\u0442\u0435\u0439\u043d\u0435\u0440\u0435 \u043f\u0440\u044f\u043c\u043e \u043d\u0430 \u0440\u043e\u0443\u0442\u0435\u0440\u0435',
             modeStandaloneHint: 'WireGuard-\u043a\u043b\u0438\u0435\u043d\u0442 \u043d\u0430 MikroTik + awg-proxy \u0437\u0430\u043f\u0443\u0441\u043a\u0430\u0435\u0442\u0441\u044f \u043d\u0430 \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u043e\u043c \u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u0435 (Raspberry Pi, VPS \u0438\u043b\u0438 \u0434\u0440\u0443\u0433\u043e\u0439 \u0441\u0435\u0440\u0432\u0435\u0440)',
             scenarioTunnelHint: '\u041c\u0430\u0440\u0448\u0440\u0443\u0442\u044b \u043d\u0430\u0441\u0442\u0440\u0430\u0438\u0432\u0430\u0435\u0442\u0435 \u0441\u0430\u043c\u043e\u0441\u0442\u043e\u044f\u0442\u0435\u043b\u044c\u043d\u043e \u0447\u0435\u0440\u0435\u0437 /ip/route \u0438\u043b\u0438 \u0434\u0440\u0443\u0433\u0438\u043c\u0438 \u0441\u043f\u043e\u0441\u043e\u0431\u0430\u043c\u0438. \u0414\u043b\u044f \u043e\u043f\u044b\u0442\u043d\u044b\u0445 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439.',
-            scenarioDnsHint: '\u041d\u0430\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u0442 \u0442\u0440\u0430\u0444\u0438\u043a \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0445 \u0441\u0435\u0440\u0432\u0438\u0441\u043e\u0432 \u0447\u0435\u0440\u0435\u0437 \u0442\u0443\u043d\u043d\u0435\u043b\u044c \u0441 \u043f\u043e\u043c\u043e\u0449\u044c\u044e DNS-\u043f\u0440\u0430\u0432\u0438\u043b. \u041b\u0443\u0447\u0448\u0435 \u0432\u0441\u0435\u0433\u043e \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u043d\u0430 \u0447\u0438\u0441\u0442\u043e\u0439 (reset) \u043a\u043e\u043d\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u0438.',
+            scenarioDnsHint: '\u041d\u0430\u043f\u0440\u0430\u0432\u043b\u044f\u0435\u0442 \u0442\u0440\u0430\u0444\u0438\u043a \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0445 \u0441\u0435\u0440\u0432\u0438\u0441\u043e\u0432 \u0447\u0435\u0440\u0435\u0437 \u0442\u0443\u043d\u043d\u0435\u043b\u044c \u0441 \u043f\u043e\u043c\u043e\u0449\u044c\u044e DNS-\u0444\u043e\u0440\u0432\u0430\u0440\u0434\u0438\u043d\u0433\u0430 (DoH). MikroTik \u0440\u0435\u0437\u043e\u043b\u0432\u0438\u0442 \u0434\u043e\u043c\u0435\u043d\u044b \u0447\u0435\u0440\u0435\u0437 DNS-over-HTTPS \u0438 \u0441\u043e\u0431\u0438\u0440\u0430\u0435\u0442 IP \u0432 \u0430\u0434\u0440\u0435\u0441\u043d\u044b\u0435 \u0441\u043f\u0438\u0441\u043a\u0438. Mangle-\u043f\u0440\u0430\u0432\u0438\u043b\u0430 \u0444\u0430\u0439\u0440\u0432\u043e\u043b\u0430 \u0437\u0430\u0442\u0435\u043c \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u0438\u0437\u0438\u0440\u0443\u044e\u0442 \u044d\u0442\u043e\u0442 \u0442\u0440\u0430\u0444\u0438\u043a \u0447\u0435\u0440\u0435\u0437 \u0442\u0443\u043d\u043d\u0435\u043b\u044c. \u041b\u0443\u0447\u0448\u0435 \u0432\u0441\u0435\u0433\u043e \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u043d\u0430 \u0447\u0438\u0441\u0442\u043e\u0439 (reset) \u043a\u043e\u043d\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u0438. \u0412\u0430\u0436\u043d\u043e: \u043e\u0442\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u0411\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u044b\u0439 DNS (DoH) \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435, \u0447\u0442\u043e\u0431\u044b DNS-\u0437\u0430\u043f\u0440\u043e\u0441\u044b \u0448\u043b\u0438 \u0447\u0435\u0440\u0435\u0437 MikroTik.',
             scenarioNonRuHint: '\u0412\u0435\u0441\u044c \u0442\u0440\u0430\u0444\u0438\u043a \u0438\u0434\u0451\u0442 \u0447\u0435\u0440\u0435\u0437 \u0442\u0443\u043d\u043d\u0435\u043b\u044c, \u043a\u0440\u043e\u043c\u0435 \u0440\u043e\u0441\u0441\u0438\u0439\u0441\u043a\u0438\u0445 IP-\u0434\u0438\u0430\u043f\u0430\u0437\u043e\u043d\u043e\u0432 (\u043e\u0431\u043d\u043e\u0432\u043b\u044f\u044e\u0442\u0441\u044f \u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u043e). \u041b\u0443\u0447\u0448\u0435 \u0432\u0441\u0435\u0433\u043e \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u043d\u0430 \u0447\u0438\u0441\u0442\u043e\u0439 (reset) \u043a\u043e\u043d\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u0438.',
-            prefixHint: '\u041c\u0435\u043d\u044f\u0439\u0442\u0435 \u043f\u0440\u0435\u0444\u0438\u043a\u0441, \u0442\u043e\u043b\u044c\u043a\u043e \u0435\u0441\u043b\u0438 \u043d\u0443\u0436\u043d\u043e 2+ \u0442\u0443\u043d\u043d\u0435\u043b\u044f \u0441 \u0440\u0430\u0437\u043d\u044b\u043c\u0438 \u043f\u0440\u0430\u0432\u0438\u043b\u0430\u043c\u0438 \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u0438\u0437\u0430\u0446\u0438\u0438'
+            prefixHint: '\u041c\u0435\u043d\u044f\u0439\u0442\u0435 \u043f\u0440\u0435\u0444\u0438\u043a\u0441, \u0442\u043e\u043b\u044c\u043a\u043e \u0435\u0441\u043b\u0438 \u043d\u0443\u0436\u043d\u043e 2+ \u0442\u0443\u043d\u043d\u0435\u043b\u044f \u0441 \u0440\u0430\u0437\u043d\u044b\u043c\u0438 \u043f\u0440\u0430\u0432\u0438\u043b\u0430\u043c\u0438 \u043c\u0430\u0440\u0448\u0440\u0443\u0442\u0438\u0437\u0430\u0446\u0438\u0438',
+            scenarioNonRuWarn: '\u0412\u041d\u0418\u041c\u0410\u041d\u0418\u0415: \u0412\u0435\u0441\u044c \u0437\u0430\u0440\u0443\u0431\u0435\u0436\u043d\u044b\u0439 \u0442\u0440\u0430\u0444\u0438\u043a \u043f\u043e\u0439\u0434\u0451\u0442 \u0447\u0435\u0440\u0435\u0437 VPN. \u0423\u0431\u0435\u0434\u0438\u0442\u0435\u0441\u044c, \u0447\u0442\u043e \u0432\u0430\u0448 \u0441\u0435\u0440\u0432\u0435\u0440 \u0432\u044b\u0434\u0435\u0440\u0436\u0438\u0442 \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0443. \u0411\u043e\u043b\u044c\u0448\u0438\u043d\u0441\u0442\u0432\u043e VPS \u0438\u043c\u0435\u044e\u0442 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u043d\u044b\u0439 \u0442\u0440\u0430\u0444\u0438\u043a. \u0422\u0438\u043f\u0438\u0447\u043d\u043e\u0435 \u0434\u043e\u043c\u043e\u0445\u043e\u0437\u044f\u0439\u0441\u0442\u0432\u043e \u0441 \u0432\u0438\u0434\u0435\u043e\u0441\u0435\u0440\u0432\u0438\u0441\u0430\u043c\u0438 \u043b\u0435\u0433\u043a\u043e \u043f\u043e\u0442\u0440\u0435\u0431\u043b\u044f\u0435\u0442 10+ \u0422\u0411/\u043c\u0435\u0441. \u0412\u0415\u0421\u042c \u0442\u043e\u0440\u0440\u0435\u043d\u0442-\u0442\u0440\u0430\u0444\u0438\u043a \u0442\u043e\u0436\u0435 \u043f\u043e\u0439\u0434\u0451\u0442 \u0447\u0435\u0440\u0435\u0437 \u0442\u0443\u043d\u043d\u0435\u043b\u044c (\u0430 \u044d\u0442\u043e \u041e\u0427\u0415\u041d\u042c \u043c\u043d\u043e\u0433\u043e \u0434\u0430\u043d\u043d\u044b\u0445). \u0418\u0433\u0440\u043e\u0432\u043e\u0439 \u0442\u0440\u0430\u0444\u0438\u043a \u0442\u043e\u0436\u0435 \u043c\u043e\u0436\u0435\u0442 \u043b\u0435\u0433\u043a\u043e \u0437\u0430\u0432\u0435\u0440\u043d\u0443\u0442\u044c\u0441\u044f \u0442\u0443\u0434\u0430. \u0412\u044b\u0431\u0438\u0440\u0430\u0439\u0442\u0435 \u044d\u0442\u043e\u0442 \u0432\u0430\u0440\u0438\u0430\u043d\u0442, \u0442\u043e\u043b\u044c\u043a\u043e \u0435\u0441\u043b\u0438 \u043d\u0430 100% \u0443\u0432\u0435\u0440\u0435\u043d\u044b.',
+            dohForwarderLabel: 'DNS-\u0444\u043e\u0440\u0432\u0430\u0440\u0434\u0435\u0440 (DoH)',
+            dohCustom: '\u0421\u0432\u043e\u0439...',
+            dohHint: '\u0412\u0441\u0435 \u0441\u0435\u0440\u0432\u0438\u0441\u044b \u0431\u0443\u0434\u0443\u0442 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c \u044d\u0442\u043e\u0433\u043e DNS-over-HTTPS (DoH) \u043f\u0440\u043e\u0432\u0430\u0439\u0434\u0435\u0440\u0430 \u0434\u043b\u044f \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043d\u0438\u044f \u0434\u043e\u043c\u0435\u043d\u043e\u0432.',
+            dnsBrowserHint: '\u041e\u0442\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u0411\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u044b\u0439 DNS (DoH) \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435.\nChrome: \u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u2192 \u041a\u043e\u043d\u0444\u0438\u0434\u0435\u043d\u0446\u0438\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u2192 \u0411\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u044c \u2192 \u0411\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u044b\u0439 DNS \u2192 \u0412\u044b\u043a\u043b\nFirefox: \u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u2192 \u041f\u0440\u0438\u0432\u0430\u0442\u043d\u043e\u0441\u0442\u044c \u2192 DNS \u0447\u0435\u0440\u0435\u0437 HTTPS \u2192 \u0412\u044b\u043a\u043b\nEdge: \u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u2192 \u041a\u043e\u043d\u0444\u0438\u0434\u0435\u043d\u0446\u0438\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u2192 \u0411\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u044c \u2192 \u0411\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u044b\u0439 DNS \u2192 \u0412\u044b\u043a\u043b\n\u0418\u043d\u0430\u0447\u0435 MikroTik \u043d\u0435 \u0443\u0432\u0438\u0434\u0438\u0442 \u0432\u0430\u0448\u0438 DNS-\u0437\u0430\u043f\u0440\u043e\u0441\u044b \u0438 \u043d\u0435 \u0441\u043c\u043e\u0436\u0435\u0442 \u043d\u0430\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0442\u0440\u0430\u0444\u0438\u043a.'
         }
     };
 
@@ -681,12 +734,17 @@
         currentLang = lang;
         try { localStorage.setItem('awg-lang', lang); } catch(e) {}
         applyI18n();
+        onScenarioChange();
     }
 
     function applyI18n() {
         var els = document.querySelectorAll('[data-i18n]');
         for (var i = 0; i < els.length; i++) {
             els[i].textContent = t(els[i].getAttribute('data-i18n'));
+        }
+        var titles = document.querySelectorAll('[data-i18n-title]');
+        for (var i = 0; i < titles.length; i++) {
+            titles[i].title = t(titles[i].getAttribute('data-i18n-title'));
         }
         var phs = document.querySelectorAll('[data-i18n-ph]');
         for (var i = 0; i < phs.length; i++) {
@@ -984,48 +1042,52 @@
     // Services & exclusions data
     // ============================================================
     var SERVICES = {
-        telegram:  {list:'Telegram',  fwd:'Google', d:['telegram.org','t.me','telesco.pe','tdesktop.com','telegram.me','telegram.dog','telegra.ph'], r:['telegram'], on:true},
-        youtube:   {list:'YouTube',   fwd:'Google', d:['youtube.com','youtu.be','googlevideo.com','ytimg.com','yt3.ggpht.com','yt.be','youtube-nocookie.com','youtubekids.com','youtube-ui.l.google.com'], r:['youtube','googlevideo'], on:true},
-        instagram: {list:'Instagram', fwd:'Google', d:['ig.me','instagram.com','cdninstagram.com','instagram.net'], r:['instagram'], on:true},
-        discord:   {list:'Discord',   fwd:'Google', d:['discord.com','discord.gg','discordapp.com','discordapp.net','dis.gd','discord.media'], r:['discord'], on:true},
-        openai:    {list:'OpenAI',    fwd:'Comss',  d:['openai.com','chatgpt.com','sora.com','oaiusercontent.com','oaistatic.com'], r:[], on:true},
-        netflix:   {list:'NetFlix',   fwd:'Google', d:['netflix.com','netflix.net','nflximg.com','nflximg.net','nflxvideo.net','nflxso.net','nflxext.com','fast.com'], r:[], on:true},
-        spotify:   {list:'Spotify',   fwd:'Google', d:['spotify.com','spoti.fi','scdn.co','spotifycdn.com','spotifycdn.net','byspotify.com','pscdn.co','spotify-everywhere.com','spotify.design','spotifycharts.com','spotifycodes.com','spotifyforbrands.com','spotifyjobs.com'], r:[], on:true},
-        twitter:   {list:'Twitter',   fwd:'Google', d:['twitter.com','x.com','t.co','twimg.com','twitpic.com','vine.co'], r:[], on:true},
-        tiktok:    {list:'TikTok',    fwd:'Google', d:['tiktok.com','tiktokcdn.com','tiktokv.com','musical.ly','tiktokcdn-us.com','tiktokd.org','byteoversea.com','ibyteimg.com','ibytedtos.com','byteimg.com'], r:[], on:true},
-        meta:      {list:'META',      fwd:'Google', d:['facebook.com','fbcdn.net','fb.com','fb.me','fbsbx.com','whatsapp.com','whatsapp.net','oculus.com','oculuscdn.com','instagram.com','cdninstagram.com'], r:['facebook','instagram','oculus','whatsapp'], on:false},
-        samsung:   {list:'Samsung',   fwd:'Google', d:['samsung.com','samsungcloud.com','samsungapps.com','samsungdm.com','samsungelectronics.com'], r:[], on:false},
-        intel:     {list:'Intel',     fwd:'Comss',  d:['intel.com','intel.co.uk','intel.co.jp','intel.de','intel.fr'], r:['intel'], on:false},
-        lg:        {list:'LG',        fwd:'Google', d:['lg.com','lgappstv.com','lge.com','lgsmartad.com'], r:[], on:false},
-        tmdb:      {list:'TMDB',      fwd:'Comss',  d:['themoviedb.org','tmdb.org','tmdb-image-prod.b-cdn.net'], r:[], on:false},
-        rezka:     {list:'Rezka',     fwd:'Comss',  d:['stream.voidboost.cc','zerocdn.com'], r:['rezka'], on:false},
-        tidal:     {list:'Tidal',     fwd:'Google', d:['tidal.com','tidalhifi.com','wimpmusic.com'], r:[], on:false},
-        steam:     {list:'Steam',     fwd:'Google', d:['steampowered.com','steamcommunity.com','steamstatic.com','steamcdn-a.akamaihd.net','steamgames.com','steamusercontent.com','valve.software','valvesoftware.com'], r:[], on:false}
+        claude:    {list:'Claude',    d:['claude.ai','anthropic.com'], r:[], on:true},
+        discord:   {list:'Discord',   d:['discord.com','discord.gg','discordapp.com','discordapp.net','dis.gd','discord.media'], r:['discord'], on:true},
+        gemini:    {list:'Gemini',    d:['gemini.google.com','aistudio.google.com','generativelanguage.googleapis.com','deepmind.google','deepmind.com'], r:[], on:false},
+        google:    {list:'GoogleWeb', d:['google.com','googleapis.com','gstatic.com','google-analytics.com','googleusercontent.com','googlesyndication.com','doubleclick.net','google.ru'], r:[], on:false},
+        instagram: {list:'Instagram', d:['ig.me','instagram.com','cdninstagram.com','instagram.net'], r:['instagram'], on:true},
+        intel:     {list:'Intel',     d:['intel.com','intel.co.uk','intel.co.jp','intel.de','intel.fr'], r:['intel'], on:false},
+        lg:        {list:'LG',        d:['lg.com','lgappstv.com','lge.com','lgsmartad.com'], r:[], on:false},
+        meta:      {list:'META',      d:['facebook.com','fbcdn.net','fb.com','fb.me','fbsbx.com','whatsapp.com','whatsapp.net','oculus.com','oculuscdn.com','instagram.com','cdninstagram.com'], r:['facebook','instagram','oculus','whatsapp'], on:false},
+        netflix:   {list:'NetFlix',   d:['netflix.com','netflix.net','nflximg.com','nflximg.net','nflxvideo.net','nflxso.net','nflxext.com','fast.com'], r:[], on:true},
+        openai:    {list:'OpenAI',    d:['openai.com','chatgpt.com','sora.com','oaiusercontent.com','oaistatic.com'], r:[], on:true},
+        rezka:     {list:'Rezka',     d:['stream.voidboost.cc','zerocdn.com'], r:['rezka'], on:false},
+        samsung:   {list:'Samsung',   d:['samsung.com','samsungcloud.com','samsungapps.com','samsungdm.com','samsungelectronics.com'], r:[], on:false},
+        spotify:   {list:'Spotify',   d:['spotify.com','spoti.fi','scdn.co','spotifycdn.com','spotifycdn.net','byspotify.com','pscdn.co','spotify-everywhere.com','spotify.design','spotifycharts.com','spotifycodes.com','spotifyforbrands.com','spotifyjobs.com'], r:[], on:true},
+        steam:     {list:'Steam',     d:['steampowered.com','steamcommunity.com','steamstatic.com','steamcdn-a.akamaihd.net','steamgames.com','steamusercontent.com','valve.software','valvesoftware.com'], r:[], on:false},
+        telegram:  {list:'Telegram',  d:['telegram.org','t.me','telesco.pe','tdesktop.com','telegram.me','telegram.dog','telegra.ph'], r:['telegram'], on:true},
+        tiktok:    {list:'TikTok',    d:['tiktok.com','tiktokcdn.com','tiktokv.com','musical.ly','tiktokcdn-us.com','tiktokd.org','byteoversea.com','ibyteimg.com','ibytedtos.com','byteimg.com'], r:[], on:true},
+        twitter:   {list:'Twitter',   d:['twitter.com','x.com','t.co','twimg.com','twitpic.com','vine.co'], r:[], on:true},
+        youtube:   {list:'YouTube',   d:['youtube.com','youtu.be','googlevideo.com','ytimg.com','yt3.ggpht.com','yt.be','youtube-nocookie.com','youtubekids.com','youtube-ui.l.google.com'], r:['youtube','googlevideo'], on:true}
     };
 
     var EXCLUSIONS = {
-        steam:   {list:'Steam',      label:'Steam',       d:['steampowered.com','steamcommunity.com','steamstatic.com','steamcdn-a.akamaihd.net','steamgames.com','steamusercontent.com','valve.software','valvesoftware.com'], r:[], fwd:'Google', on:true},
-        epic:    {list:'EpicGames',   label:'Epic Games',  d:['epicgames.com','unrealengine.com','fortnite.com','epicgames.dev'], r:[], fwd:'Google', on:false},
-        blizzard:{list:'Blizzard',    label:'Battle.net',  d:['blizzard.com','battle.net','blizzard.net'], r:[], fwd:'Google', on:false},
-        apple:   {list:'Apple',       label:'Apple',       d:['apple.com','icloud.com','mzstatic.com','apple-dns.net','cdn-apple.com'], r:[], fwd:'Google', on:false},
-        microsoft:{list:'Microsoft',  label:'Microsoft',   d:['microsoft.com','windowsupdate.com','live.com','office.com','office.net','msftconnecttest.com','azure.com'], r:[], fwd:'Google', on:false}
+        steam:   {list:'Steam',      label:'Steam',       d:['steampowered.com','steamcommunity.com','steamstatic.com','steamcdn-a.akamaihd.net','steamgames.com','steamusercontent.com','valve.software','valvesoftware.com'], r:[], on:true},
+        epic:    {list:'EpicGames',   label:'Epic Games',  d:['epicgames.com','unrealengine.com','fortnite.com','epicgames.dev'], r:[], on:false},
+        blizzard:{list:'Blizzard',    label:'Battle.net',  d:['blizzard.com','battle.net','blizzard.net'], r:[], on:false},
+        apple:   {list:'Apple',       label:'Apple',       d:['apple.com','icloud.com','mzstatic.com','apple-dns.net','cdn-apple.com'], r:[], on:false},
+        microsoft:{list:'Microsoft',  label:'Microsoft',   d:['microsoft.com','windowsupdate.com','live.com','office.com','office.net','msftconnecttest.com','azure.com'], r:[], on:false}
     };
 
     var DOH_FORWARDERS = [
-        {doh:'https://dns.google/dns-query', name:'Google'},
-        {doh:'https://dns.comss.one/mikrotik', name:'Comss'},
+        {doh:'https://dns.google/dns-query', name:'GoogleDNS'},
         {doh:'https://cloudflare-dns.com/dns-query', name:'CloudFlare'},
-        {doh:'https://dns.quad9.net/dns-query', name:'Quad9'}
+        {doh:'https://dns.comss.one/mikrotik', name:'Comss'},
+        {doh:'https://dns.quad9.net/dns-query', name:'Quad9'},
+        {doh:'https://common.dot.dns.yandex.net/dns-query', name:'Yandex'}
     ];
 
     var DNS_STATICS = [
+        {addr:'8.8.8.8', comment:'DNS GoogleDNS', name:'dns.google'},
+        {addr:'8.8.4.4', comment:'DNS GoogleDNS', name:'dns.google'},
         {addr:'1.1.1.1', comment:'DNS CloudFlare', name:'cloudflare-dns.com'},
         {addr:'1.0.0.1', comment:'DNS CloudFlare', name:'cloudflare-dns.com'},
-        {addr:'8.8.8.8', comment:'DNS Google', name:'dns.google'},
-        {addr:'8.8.4.4', comment:'DNS Google', name:'dns.google'},
+        {addr:'195.133.25.16', comment:'DNS Comss', name:'dns.comss.one'},
         {addr:'9.9.9.9', comment:'DNS Quad9', name:'dns.quad9.net'},
         {addr:'149.112.112.112', comment:'DNS Quad9', name:'dns.quad9.net'},
-        {addr:'195.133.25.16', comment:'DNS Comss', name:'dns.comss.one'}
+        {addr:'77.88.8.8', comment:'DNS Yandex', name:'common.dot.dns.yandex.net'},
+        {addr:'77.88.8.1', comment:'DNS Yandex', name:'common.dot.dns.yandex.net'}
     ];
 
     // ============================================================
@@ -1036,7 +1098,7 @@
         for (var i = 0; i < radios.length; i++) {
             if (radios[i].checked) return radios[i].value;
         }
-        return 'tunnel';
+        return 'dns-fwd';
     }
 
     function onScenarioChange() {
@@ -1044,9 +1106,15 @@
         document.getElementById('services-panel').style.display = s === 'dns-fwd' ? 'block' : 'none';
         document.getElementById('exclusions-panel').style.display = s === 'non-ru' ? 'block' : 'none';
         document.getElementById('fasttrack-warn').style.display = (s === 'dns-fwd' || s === 'non-ru') ? 'block' : 'none';
+        document.getElementById('non-ru-warn').style.display = s === 'non-ru' ? 'block' : 'none';
         var hintKey = s === 'dns-fwd' ? 'scenarioDnsHint' : s === 'non-ru' ? 'scenarioNonRuHint' : 'scenarioTunnelHint';
-        document.getElementById('scenario-hint').setAttribute('data-i18n', hintKey);
-        document.getElementById('scenario-hint').textContent = t(hintKey);
+        var hintEl = document.getElementById('scenario-hint');
+        hintEl.setAttribute('data-i18n', hintKey);
+        if (s === 'dns-fwd') {
+            hintEl.innerHTML = t(hintKey) + ' <span class="dns-info-icon" title="' + esc(t('dnsBrowserHint')).replace(/\n/g, '&#10;') + '" data-i18n-title="dnsBrowserHint">&#9432;</span>';
+        } else {
+            hintEl.textContent = t(hintKey);
+        }
     }
 
     function initServiceCheckboxes() {
@@ -1095,20 +1163,19 @@
     // ============================================================
     // Routing scenario builders
     // ============================================================
-    function buildFwdEntries(prefix, serviceKeys, svcMap) {
+    function buildFwdEntries(prefix, serviceKeys, svcMap, forwarderName) {
         var lines = [];
         for (var i = 0; i < serviceKeys.length; i++) {
             var svc = svcMap[serviceKeys[i]];
             if (!svc) continue;
-            // Compact: foreach loop over domain array
             var domains = [];
             for (var j = 0; j < svc.d.length; j++) domains.push('"' + svc.d[j] + '"');
             lines.push(':foreach d in={' + domains.join(';') + '} do={');
-            lines.push('  /ip/dns/static/add address-list=' + svc.list + ' forward-to=' + svc.fwd + ' match-subdomain=yes type=FWD name=$d comment=' + prefix + '-dns-fwd');
+            lines.push('  /ip/dns/static/add address-list=' + svc.list + ' forward-to=' + forwarderName + ' match-subdomain=yes type=FWD name=$d comment=' + prefix + '-dns-fwd');
             lines.push('}');
             if (svc.r) {
                 for (var j = 0; j < svc.r.length; j++) {
-                    lines.push('/ip/dns/static/add address-list=' + svc.list + ' forward-to=' + svc.fwd + ' type=FWD regexp=' + svc.r[j] + ' comment=' + prefix + '-dns-fwd');
+                    lines.push('/ip/dns/static/add address-list=' + svc.list + ' forward-to=' + forwarderName + ' type=FWD regexp=' + svc.r[j] + ' comment=' + prefix + '-dns-fwd');
                 }
             }
         }
@@ -1117,8 +1184,8 @@
 
     function buildPolicyRouting(prefix, tableName, commentTag) {
         return [
-            '/routing/table/add name=' + tableName + ' fib comment=' + commentTag,
-            '/ip/route/add dst-address=0.0.0.0/0 gateway=wg-' + prefix + ' routing-table=' + tableName + ' comment=' + commentTag
+            ':do { /routing/table/add name=' + tableName + ' fib comment=' + commentTag + ' } on-error={}',
+            ':do { /ip/route/add dst-address=0.0.0.0/0 gateway=wg-' + prefix + ' routing-table=' + tableName + ' comment=' + commentTag + ' } on-error={}'
         ];
     }
 
@@ -1132,27 +1199,60 @@
         ];
     }
 
-    function buildDnsRoutingScenario(prefix, selectedServices) {
+    function getSelectedDohForwarder() {
+        var radios = document.getElementsByName('doh-fwd');
+        for (var i = 0; i < radios.length; i++) {
+            if (radios[i].checked) return radios[i].value;
+        }
+        return 'GoogleDNS';
+    }
+
+    function getDohForwarderInfo(forwarderName) {
+        if (forwarderName === '__custom') {
+            var url = document.getElementById('doh-custom-url').value.trim();
+            if (url.indexOf('https://') === 0) {
+                return {doh: url, name: 'CustomDoH', isDoH: true};
+            }
+            return {addr: url, name: 'CustomDNS', isDoH: false};
+        }
+        for (var i = 0; i < DOH_FORWARDERS.length; i++) {
+            if (DOH_FORWARDERS[i].name === forwarderName) return {doh: DOH_FORWARDERS[i].doh, name: DOH_FORWARDERS[i].name, isDoH: true};
+        }
+        return {doh: DOH_FORWARDERS[0].doh, name: DOH_FORWARDERS[0].name, isDoH: true};
+    }
+
+    function getDnsStaticsForForwarder(forwarderName) {
+        return DNS_STATICS.filter(function(s) { return s.comment === 'DNS ' + forwarderName; });
+    }
+
+    function buildDnsRoutingScenario(prefix, selectedServices, forwarderName) {
+        var fwd = getDohForwarderInfo(forwarderName);
         var lines = [];
         lines.push('');
         lines.push('# ============================================================');
         lines.push('# DNS-based routing for selected services');
         lines.push('# ============================================================');
         lines.push('{');
-        lines.push('# DoH forwarders');
-        for (var i = 0; i < DOH_FORWARDERS.length; i++) {
-            var f = DOH_FORWARDERS[i];
-            lines.push(':do { /ip/dns/forwarders/add doh-servers=' + f.doh + ' name=' + f.name + ' comment=' + prefix + '-dns-fwd } on-error={}');
+        if (fwd.isDoH) {
+            lines.push('# DoH forwarder');
+            lines.push(':do { /ip/dns/forwarders/add doh-servers=' + fwd.doh + ' name=' + fwd.name + ' comment=' + prefix + '-dns-fwd } on-error={}');
+            var statics = getDnsStaticsForForwarder(fwd.name);
+            if (statics.length > 0) {
+                lines.push('# DNS static entries for DoH resolver IPs');
+                for (var i = 0; i < statics.length; i++) {
+                    lines.push('/ip/dns/static/add address=' + statics[i].addr + ' comment="' + prefix + '-dns-fwd" name=' + statics[i].name + ' type=A');
+                }
+            }
+        } else {
+            lines.push('# Custom DNS static entry');
+            lines.push('/ip/dns/static/add address=' + fwd.addr + ' comment="' + prefix + '-dns-fwd" name=' + fwd.name + ' type=A');
         }
-        lines.push('# DNS static entries for DoH resolver IPs');
-        for (var i = 0; i < DNS_STATICS.length; i++) {
-            var s = DNS_STATICS[i];
-            lines.push('/ip/dns/static/add address=' + s.addr + ' comment="' + prefix + '-dns-fwd" name=' + s.name + ' type=A');
-        }
+        var fwdName = fwd.name;
         lines.push('# FWD entries');
-        lines = lines.concat(buildFwdEntries(prefix, selectedServices, SERVICES));
+        lines = lines.concat(buildFwdEntries(prefix, selectedServices, SERVICES, fwdName));
+        lines.push('# Policy routing');
+        lines = lines.concat(buildPolicyRouting(prefix, prefix + '-fwd-table', prefix + '-fwd'));
         lines.push('# Mangle rules');
-        // Compact: foreach loop over address-list names
         var listNames = [];
         for (var i = 0; i < selectedServices.length; i++) {
             var svc = SERVICES[selectedServices[i]];
@@ -1162,8 +1262,6 @@
         lines.push('  /ip/firewall/mangle/add chain=prerouting action=mark-connection new-connection-mark=' + prefix + '-fwd-conn dst-address-list=$l in-interface-list=LAN passthrough=yes comment=' + prefix + '-fwd');
         lines.push('}');
         lines.push('/ip/firewall/mangle/add chain=prerouting action=mark-routing new-routing-mark=' + prefix + '-fwd-table connection-mark=' + prefix + '-fwd-conn in-interface-list=LAN passthrough=no comment=' + prefix + '-fwd');
-        lines.push('# Policy routing');
-        lines = lines.concat(buildPolicyRouting(prefix, prefix + '-fwd-table', prefix + '-fwd'));
         lines.push('# Disable fasttrack for policy routing');
         lines.push(':foreach rule in=[/ip/firewall/filter/find where action=fasttrack-connection] do={');
         lines.push('  :local origComment [/ip/firewall/filter/get $rule comment]');
@@ -1173,7 +1271,8 @@
         return lines;
     }
 
-    function buildNonRuScenario(prefix, exclusionKeys) {
+    function buildNonRuScenario(prefix, exclusionKeys, forwarderName, storageDisk) {
+        var fwd = getDohForwarderInfo(forwarderName);
         var lines = [];
         lines.push('');
         lines.push('# ============================================================');
@@ -1183,7 +1282,15 @@
         lines.push('# RU address-list update script');
         lines.push('/system/script/add name=' + prefix + '-update-ru policy=read,write,test,ftp comment=' + prefix + '-ru source={');
         lines.push('  :local url "' + REPO.dl + 'ru_ranges.rsc"');
-        lines.push('  :local fileName "ru_ranges.rsc"');
+        if (storageDisk === '__auto') {
+            lines.push('  :local awgDisk "disk1"');
+            lines.push('  :do { :set awgDisk [/container/envs/get [find where list="' + prefix + '-env" key="AWG_STORAGE"] value] } on-error={}');
+            lines.push('  :local fileName ($awgDisk . "/ru_ranges.rsc")');
+        } else if (storageDisk === 'disk1') {
+            lines.push('  :local fileName "ru_ranges.rsc"');
+        } else {
+            lines.push('  :local fileName "' + storageDisk + '/ru_ranges.rsc"');
+        }
         lines.push('  :do { /tool/fetch url=$url dst-path=$fileName mode=https http-header-field="User-Agent: MikroTik" http-max-redirect-count=10');
         lines.push('  } on-error={ :log error "RU list: fetch failed"; :error "fetch failed" }');
         lines.push('  :delay 2s');
@@ -1210,21 +1317,25 @@
         lines.push('/system/scheduler/add name=' + prefix + '-update-ru interval=1d start-time=04:05:00 on-event="/system/script/run ' + prefix + '-update-ru" policy=read,write,test,ftp comment=' + prefix + '-ru');
         lines.push('/system/script/run ' + prefix + '-update-ru');
 
-        // Mangle + routing wrapped in a single block
-        lines.push('{');
+        // Mangle + routing; wrap in {...} block only when exclusions present
         if (exclusionKeys.length > 0) {
-            lines.push('# DoH forwarders');
-            for (var i = 0; i < DOH_FORWARDERS.length; i++) {
-                var f = DOH_FORWARDERS[i];
-                lines.push(':do { /ip/dns/forwarders/add doh-servers=' + f.doh + ' name=' + f.name + ' comment=' + prefix + '-dns-fwd } on-error={}');
-            }
-            lines.push('# DNS static entries for DoH resolver IPs');
-            for (var i = 0; i < DNS_STATICS.length; i++) {
-                var s = DNS_STATICS[i];
-                lines.push('/ip/dns/static/add address=' + s.addr + ' comment="' + prefix + '-dns-fwd" name=' + s.name + ' type=A');
+            lines.push('{');
+            if (fwd.isDoH) {
+                lines.push('# DoH forwarder');
+                lines.push(':do { /ip/dns/forwarders/add doh-servers=' + fwd.doh + ' name=' + fwd.name + ' comment=' + prefix + '-dns-fwd } on-error={}');
+                var statics = getDnsStaticsForForwarder(fwd.name);
+                if (statics.length > 0) {
+                    lines.push('# DNS static entries for DoH resolver IPs');
+                    for (var i = 0; i < statics.length; i++) {
+                        lines.push('/ip/dns/static/add address=' + statics[i].addr + ' comment="' + prefix + '-dns-fwd" name=' + statics[i].name + ' type=A');
+                    }
+                }
+            } else {
+                lines.push('# Custom DNS static entry');
+                lines.push('/ip/dns/static/add address=' + fwd.addr + ' comment="' + prefix + '-dns-fwd" name=' + fwd.name + ' type=A');
             }
             lines.push('# FWD entries for exclusions');
-            lines = lines.concat(buildFwdEntries(prefix, exclusionKeys, EXCLUSIONS));
+            lines = lines.concat(buildFwdEntries(prefix, exclusionKeys, EXCLUSIONS, fwd.name));
         }
 
         lines.push('# Mangle: accept private & special networks');
@@ -1246,17 +1357,19 @@
             lines.push('}');
         }
 
+        lines.push('# Policy routing');
+        lines = lines.concat(buildPolicyRouting(prefix, prefix + '-non-ru-table', prefix + '-non-ru'));
         lines.push('# Mark everything else for tunnel');
         lines.push('/ip/firewall/mangle/add chain=prerouting action=mark-connection new-connection-mark=' + prefix + '-non-ru-conn in-interface-list=LAN passthrough=yes comment=' + prefix + '-non-ru');
         lines.push('/ip/firewall/mangle/add chain=prerouting action=mark-routing new-routing-mark=' + prefix + '-non-ru-table connection-mark=' + prefix + '-non-ru-conn in-interface-list=LAN passthrough=no comment=' + prefix + '-non-ru');
-        lines.push('# Policy routing');
-        lines = lines.concat(buildPolicyRouting(prefix, prefix + '-non-ru-table', prefix + '-non-ru'));
         lines.push('# Disable fasttrack for policy routing');
         lines.push(':foreach rule in=[/ip/firewall/filter/find where action=fasttrack-connection] do={');
         lines.push('  :local origComment [/ip/firewall/filter/get $rule comment]');
         lines.push('  /ip/firewall/filter/set $rule disabled=yes comment=("disabled-by-' + prefix + '|" . $origComment)');
         lines.push('}');
-        lines.push('}');
+        if (exclusionKeys.length > 0) {
+            lines.push('}');
+        }
 
         return lines;
     }
@@ -1300,8 +1413,8 @@
         var isAuto = storageDisk === '__auto';
         var src = [];
         src.push('/system/script/add name=' + prefix + '-uninstall comment=' + prefix + ' source={');
-        src.push('  :put "Uninstallimg AmneziaWG..."');
-        src.push('  :log info "Uninstallimg AmneziaWG..."');
+        src.push('  :put "Uninstalling AmneziaWG..."');
+        src.push('  :log info "Uninstalling AmneziaWG..."');
         if (hasDNS) {
             src.push('  :local prevDNS ""');
             src.push('  :do { :set prevDNS [/container/envs/get [find where list="' + prefix + '-env" key="AWG_PREV_DNS"] value] } on-error={}');
@@ -1998,14 +2111,18 @@
         document.getElementById('output').innerHTML = highlight(commands);
         document.getElementById('output-section').style.display = 'block';
 
+        var dohFwd = getSelectedDohForwarder();
+        var storageDisk = getStorageDisk();
+
         // Routing section (separate for dns-fwd/non-ru to avoid terminal buffer overflow)
         var routingSection = document.getElementById('routing-section');
         if (scenario === 'dns-fwd' || scenario === 'non-ru') {
             var routingCommands = '';
             if (scenario === 'dns-fwd') {
-                routingCommands = buildDnsRoutingScenario(prefix, selectedServices).join('\n') + '\n';
+                routingCommands = buildDnsRoutingScenario(prefix, selectedServices, dohFwd).join('\n') + '\n';
             } else {
-                routingCommands = buildNonRuScenario(prefix, exclusions).join('\n') + '\n';
+                var nonRuStorage = (mode === 'standalone') ? 'disk1' : storageDisk;
+                routingCommands = buildNonRuScenario(prefix, exclusions, dohFwd, nonRuStorage).join('\n') + '\n';
             }
             document.getElementById('routing-output').dataset.plain = routingCommands;
             document.getElementById('routing-output').innerHTML = highlight(routingCommands);
@@ -2032,7 +2149,9 @@
                 proxyIP: document.getElementById('proxy-ip').value,
                 scenario: scenario,
                 selectedServices: selectedServices,
-                exclusions: exclusions
+                exclusions: exclusions,
+                dohForwarder: dohFwd,
+                dohCustomUrl: document.getElementById('doh-custom-url').value
             }));
         } catch(e) {}
 
@@ -2068,6 +2187,11 @@
         onScenarioChange();
         initServiceCheckboxes();
         initExclusionCheckboxes();
+        // Reset DoH forwarder
+        var dohRadios = document.getElementsByName('doh-fwd');
+        dohRadios[0].checked = true;
+        document.getElementById('doh-custom-url').style.display = 'none';
+        document.getElementById('doh-custom-url').value = '';
         document.getElementById('conf-input').focus();
     }
 
@@ -2113,6 +2237,19 @@
             btn.classList.add('btn-secondary');
         }, 2000);
     }
+
+    // ============================================================
+    // DoH selector handler
+    // ============================================================
+    document.getElementById('doh-selector').addEventListener('change', function(e) {
+        var custom = document.getElementById('doh-custom-url');
+        if (e.target.value === '__custom') {
+            custom.style.display = 'block';
+            custom.focus();
+        } else {
+            custom.style.display = 'none';
+        }
+    });
 
     document.getElementById('conf-input').addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generate();
@@ -2161,6 +2298,16 @@
                     cbs[i].checked = s.exclusions.indexOf(cbs[i].value) >= 0;
                 }
             }
+            if (s.dohForwarder) {
+                var dohRadio = document.querySelector('input[name="doh-fwd"][value="' + s.dohForwarder + '"]');
+                if (dohRadio) {
+                    dohRadio.checked = true;
+                    if (s.dohForwarder === '__custom') {
+                        document.getElementById('doh-custom-url').style.display = 'block';
+                        if (s.dohCustomUrl) document.getElementById('doh-custom-url').value = s.dohCustomUrl;
+                    }
+                }
+            }
         } catch(e) {}
     })();
 
@@ -2170,6 +2317,8 @@
 
     // Apply i18n on load
     applyI18n();
+    // Refresh scenario hint (restores info icon for dns-fwd)
+    onScenarioChange();
 </script>
 </body>
 </html>
