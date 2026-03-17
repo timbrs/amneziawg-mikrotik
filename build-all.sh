@@ -14,10 +14,11 @@ echo ""
 
 # --- Binaries ---
 echo "--- Binaries ---"
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64         go build -trimpath -ldflags="$LDFLAGS" -o "$DIR/$IMAGE-linux-arm64" . &
-CGO_ENABLED=0 GOOS=linux GOARCH=arm   GOARM=7 go build -trimpath -ldflags="$LDFLAGS" -o "$DIR/$IMAGE-linux-arm"   . &
-CGO_ENABLED=0 GOOS=linux GOARCH=arm   GOARM=5 go build -trimpath -ldflags="$LDFLAGS" -o "$DIR/$IMAGE-linux-armv5" . &
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64         go build -trimpath -ldflags="$LDFLAGS" -o "$DIR/$IMAGE-linux-amd64" . &
+CGO_ENABLED=0 GOOS=linux   GOARCH=arm64         go build -trimpath -ldflags="$LDFLAGS" -o "$DIR/$IMAGE-linux-arm64"   . &
+CGO_ENABLED=0 GOOS=linux   GOARCH=arm   GOARM=7 go build -trimpath -ldflags="$LDFLAGS" -o "$DIR/$IMAGE-linux-arm"     . &
+CGO_ENABLED=0 GOOS=linux   GOARCH=arm   GOARM=5 go build -trimpath -ldflags="$LDFLAGS" -o "$DIR/$IMAGE-linux-armv5"   . &
+CGO_ENABLED=0 GOOS=linux   GOARCH=amd64         go build -trimpath -ldflags="$LDFLAGS" -o "$DIR/$IMAGE-linux-amd64"   . &
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64         go build -trimpath -ldflags="$LDFLAGS" -o "$DIR/$IMAGE-windows-amd64.exe" . &
 wait
 echo "Binaries done"
 echo ""
@@ -48,5 +49,5 @@ echo "Classic Docker images done"
 echo ""
 
 # --- Summary ---
-echo "=== All 12 artifacts ==="
+echo "=== All 13 artifacts ==="
 ls -lh "$DIR/"

@@ -17,6 +17,7 @@
 - [Ручная установка](#ручная-установка)
 - [Получение параметров AWG](#получение-параметров-awg)
 - [Дополнительные настройки](#дополнительные-настройки)
+- [Запуск на Windows (Standalone)](#запуск-на-windows-standalone)
 - [Удаление](#удаление)
 - [Устранение неполадок](#устранение-неполадок)
   - [Storage device not found](#storage-device-not-found)
@@ -272,6 +273,93 @@ NAT для маркированного трафика:
 
 Теперь весь трафик к адресам из списка `to_vpn` будет идти через туннель. Добавляйте адреса в список по мере необходимости.
 
+## Запуск на Windows (Standalone)
+
+Если на роутере нет поддержки контейнеров (RouterOS Lite, мало памяти) или нужно сохранить существующий WireGuard-интерфейс, awg-proxy можно запустить на любом Windows-компьютере в локальной сети.
+
+### Схема работы
+
+```
+MikroTik WG-клиент ──UDP──> [awg-proxy на Windows] ──UDP──> сервер AmneziaWG
+   (192.168.1.1)              (192.168.1.100:51820)           (внешний IP:порт)
+```
+
+### 1. Скачайте бинарник
+
+Скачайте `awg-proxy-windows-amd64.exe` со страницы [Releases](https://github.com/timbrs/amneziawg-mikrotik/releases).
+
+### 2. Настройте переменные окружения и запустите
+
+Все параметры берутся из `.conf`-файла AmneziaWG. Замените значения на свои.
+
+**PowerShell:**
+
+```powershell
+$env:AWG_LISTEN = ":51820"
+$env:AWG_REMOTE = "SERVER_IP:PORT"
+$env:AWG_JC = "5"
+$env:AWG_JMIN = "30"
+$env:AWG_JMAX = "500"
+$env:AWG_S1 = "20"
+$env:AWG_S2 = "20"
+$env:AWG_H1 = "1234567890"
+$env:AWG_H2 = "1234567891"
+$env:AWG_H3 = "1234567892"
+$env:AWG_H4 = "1234567893"
+$env:AWG_SERVER_PUB = "SERVER_PUBLIC_KEY_BASE64"
+$env:AWG_CLIENT_PUB = "CLIENT_PUBLIC_KEY_BASE64"
+
+.\awg-proxy-windows-amd64.exe
+```
+
+**CMD:**
+
+```cmd
+set AWG_LISTEN=:51820
+set AWG_REMOTE=SERVER_IP:PORT
+set AWG_JC=5
+set AWG_JMIN=30
+set AWG_JMAX=500
+set AWG_S1=20
+set AWG_S2=20
+set AWG_H1=1234567890
+set AWG_H2=1234567891
+set AWG_H3=1234567892
+set AWG_H4=1234567893
+set AWG_SERVER_PUB=SERVER_PUBLIC_KEY_BASE64
+set AWG_CLIENT_PUB=CLIENT_PUBLIC_KEY_BASE64
+
+awg-proxy-windows-amd64.exe
+```
+
+> `AWG_CLIENT_PUB` -- публичный ключ WireGuard-клиента на MikroTik. Его можно получить командой `/interface/wireguard/print` на роутере.
+
+### 3. Настройте MikroTik
+
+Используйте конфигуратор в режиме **MikroTik + Server (Standalone)**, указав IP Windows-машины. Конфигуратор сгенерирует все нужные команды для роутера.
+
+Или вручную: создайте WireGuard-интерфейс с `endpoint-address=IP_WINDOWS_МАШИНЫ` и `endpoint-port=51820`.
+
+### 4. Файрвол Windows
+
+Разрешите входящий UDP-трафик на порт 51820. В PowerShell от администратора:
+
+```powershell
+New-NetFirewallRule -DisplayName "awg-proxy" -Direction Inbound -Protocol UDP -LocalPort 51820 -Action Allow
+```
+
+### 5. Автозапуск (опционально)
+
+Для автоматического запуска при старте Windows создайте bat-файл с переменными окружения и командой запуска, затем добавьте его в планировщик задач или в автозагрузку.
+
+Или создайте Windows-службу через [NSSM](https://nssm.cc/):
+
+```cmd
+nssm install awg-proxy "C:\path\to\awg-proxy-windows-amd64.exe"
+nssm set awg-proxy AppEnvironmentExtra AWG_LISTEN=:51820 AWG_REMOTE=SERVER_IP:PORT ...
+nssm start awg-proxy
+```
+
 ## Удаление
 
 Если установка была через конфигуратор:
@@ -396,9 +484,26 @@ make docker-arm-7.20-docker
 make docker-armv5-7.20-docker
 make docker-amd64-7.20-docker
 make docker-all-7.20-docker
+
+# Windows-бинарник (Standalone)
+make binary-windows-amd64
 ```
 
 Артефакты создаются в директории `builds/`.
+
+### Сборка на Windows без make
+
+```powershell
+$env:CGO_ENABLED = "0"
+go build -trimpath -ldflags="-s -w" -o builds/awg-proxy.exe .
+```
+
+Для кросс-компиляции Linux-бинарников на Windows:
+
+```powershell
+$env:CGO_ENABLED = "0"; $env:GOOS = "linux"; $env:GOARCH = "arm64"
+go build -trimpath -ldflags="-s -w" -o builds/awg-proxy-linux-arm64 .
+```
 
 ## Лицензия
 

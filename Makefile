@@ -4,7 +4,7 @@ BUILD_DIR = builds
 
 .PHONY: build test clean docker-arm64 docker-arm docker-armv5 docker-amd64 docker-all \
 	docker-arm64-7.20-docker docker-arm-7.20-docker docker-armv5-7.20-docker docker-amd64-7.20-docker docker-all-7.20-docker \
-	binary-arm64 binary-arm binary-armv5 binary-amd64 binary-all
+	binary-arm64 binary-arm binary-armv5 binary-amd64 binary-windows-amd64 binary-all
 
 LDFLAGS = -s -w -X main.version=$(VERSION)
 
@@ -86,4 +86,8 @@ binary-amd64:
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(IMAGE_NAME)-linux-amd64 .
 
-binary-all: binary-arm64 binary-arm binary-armv5 binary-amd64
+binary-windows-amd64:
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(IMAGE_NAME)-windows-amd64.exe .
+
+binary-all: binary-arm64 binary-arm binary-armv5 binary-amd64 binary-windows-amd64
